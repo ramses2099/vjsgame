@@ -6,6 +6,12 @@ enum SHAPE {
   SQUARE
 }
 
+interface RGBColor {
+  r: number
+  g: number
+  b: number
+}
+
 interface Boundaries {
   x: number
   y: number
@@ -194,6 +200,21 @@ class Vector {
   }
   //
   /**
+   * Returns a random 2D vector
+   *
+   * @return v - The Vector.
+   *
+   */
+  static random2D (min: number, max: number): Vector {
+    let minCeiled = Math.ceil(min)
+    let maxFloored = Math.floor(max)
+    let x = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled)
+    let y = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled)
+    return new Vector(x, y)
+  }
+  //
+
+  /**
    * Vector to string
    *
    * @return v - The Vector to strig representation.
@@ -205,7 +226,6 @@ class Vector {
 }
 
 class Body implements GameObject {
-  force: Vector
   radius: number
   isStatic: boolean
   type: string
@@ -215,6 +235,8 @@ class Body implements GameObject {
   accelaration: Vector
   mass: number
   restitution: number
+  friction: number
+  isGravity: boolean
   color: string
   width: number
   height: number
@@ -233,13 +255,14 @@ class Body implements GameObject {
   ) {
     this.position = position
     this.velocity = new Vector()
-    this.accelaration = new Vector(5, 3)
+    this.accelaration = new Vector(0, 0)
     this.radius = radius
     this.mass = mass
-    this.force = new Vector()
     this.shape = shape
     this.isStatic = isStatic
+    this.isGravity = false
     this.restitution = 1
+    this.friction = 0.98
     this.color = color
     this.type = 'na'
     this.lineWidth = lineWidth
@@ -248,8 +271,18 @@ class Body implements GameObject {
     this.height = 40
   }
   //
+  setGravity (isGravity: boolean): void {
+    this.isGravity = isGravity
+    if (isGravity) {
+      this.restitution = 0.7
+    } else {
+      this.restitution = 1
+    }
+  }
+
+  //
   applyForce (force: Vector) {
-    this.force.add(force)
+    this.accelaration.add(force)
   }
   //
   draw (ctx: CanvasRenderingContext2D | null): void {
@@ -316,11 +349,33 @@ class PhysicsWorld {
 
   update (delataTime: number): void {
     // update object
-    this.objects.forEach((o: GameObject) => {
+    this.objects.forEach((o: Body) => {
+      //apply gravity
+      if (o.isGravity) {
+        o.applyForce(this.gravity)
+      }
       o.update(delataTime)
     })
     //
     this.checkWallCollision()
+    // collition
+    for (let i = 0; i < this.objects.length; i++) {
+      const body1 = this.objects.at(i)
+      for (let j = 1; i < this.objects.length; i++) {
+        const body2 = this.objects.at(j)
+        if (body1 != undefined && body2 != undefined) {
+          if (body1.shape == SHAPE.CIRCLE && body2.shape == SHAPE.CIRCLE) {
+            if (this.checkCircleToCircle(body1, body2)) {
+              let mass1 = body1.mass * -1
+              let mass2 = body2.mass * -1
+              // body1.velocity.mult(mass1)
+              // body2.velocity.mult(mass2)
+              console.log('hit')
+            }
+          }
+        }
+      }
+    }
   }
 
   checkWallCollision () {
@@ -341,7 +396,16 @@ class PhysicsWorld {
             body.position.y > this.boundaries.h - body.radius ||
             body.position.y <= body.radius
           ) {
-            body.velocity.y *= -body.restitution
+            if (body.isGravity) {
+              // Friction
+              if (body.position.y + body.radius >= this.boundaries.h) {
+                body.position.y = this.boundaries.h - body.radius
+                body.velocity.y = -body.velocity.y * body.restitution
+                body.velocity.x *= body.friction
+              }
+            } else {
+              body.velocity.y *= -body.restitution
+            }
           }
         } else if (body.shape == SHAPE.SQUARE) {
           if (
@@ -362,7 +426,7 @@ class PhysicsWorld {
     }
   }
 
-  checkCircleRectCollision (circle: Body, box: Body): boolean {
+  checkCircleToRectCollision (circle: Body, box: Body): boolean {
     const closetX = Math.max(
       box.position.x,
       Math.min(circle.position.x, box.position.x + box.width)
@@ -378,13 +442,24 @@ class PhysicsWorld {
     return distSqueared < circle.radius * circle.radius
   }
 
-  checkRectRectCollision (box1: Body, box2: Body): boolean {
+  checkRectToRectCollision (box1: Body, box2: Body): boolean {
     return (
       box1.position.x < box2.position.x + box2.width &&
       box1.position.x + box1.width > box2.position.x &&
       box1.position.y < box2.position.y + box2.height &&
       box1.position.y + box1.height > box2.position.y
     )
+  }
+
+  checkCircleToCircle (circle1: Body, circle2: Body): boolean {
+    const dx = circle1.position.x - circle2.position.x
+    const dy = circle1.position.y - circle2.position.y
+
+    const dist = Math.sqrt(dx * dx + dy * dy)
+
+    const radiiSum = circle1.radius + circle2.radius
+    console.log(dist)
+    return dist <= radiiSum
   }
 }
 
@@ -425,7 +500,7 @@ class Game {
     )
 
     const body = new Body(new Vector(30, 50))
-    body.applyForce(new Vector(200, 300))
+    body.setGravity(true)
     this.world.addObjectToWorld(body)
 
     const body2 = new Body(new Vector(30, 50))
@@ -435,6 +510,27 @@ class Game {
     body2.color = 'rgba(239, 13, 239, 1)'
     body2.shape = SHAPE.SQUARE
     this.world.addObjectToWorld(body2)
+
+    const body3 = new Body(new Vector(30, 50))
+    body3.applyForce(new Vector(3, 7))
+    body3.color = 'rgb(243, 21, 39)'
+
+    this.world.addObjectToWorld(body3)
+
+    //test
+    for (let i = 0; i < 4; i++) {
+      let position: Vector = Vector.random2D(this.world.boundaries.w, 50)
+      let b = new Body(position)
+      b.radius = 25 //this.getRandomInt(20)
+      b.color = this.getRandomColor()
+      b.mass = this.getRandomInt(20)
+      let x = this.getRandomInt(10)
+      let y = this.getRandomInt(15)
+      b.applyForce(new Vector(x, y))
+
+      this.world.addObjectToWorld(b)
+    }
+    console.log(`Count object: ${this.world.objectCount}`)
 
     // 3. Input Handling
     this.keys = new Set<string>()
@@ -505,8 +601,18 @@ class Game {
     requestAnimationFrame(this.loop)
   }
 
-  togglePause () {
-    // Implementation of pause state logic
+  getRandomColor (): string {
+    const color: RGBColor = {
+      r: Math.floor(Math.random() * 256),
+      g: Math.floor(Math.random() * 256),
+      b: Math.floor(Math.random() * 256)
+    }
+
+    return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`
+  }
+
+  getRandomInt (n: number): number {
+    return Math.floor(Math.random() * n)
   }
 
   stop () {

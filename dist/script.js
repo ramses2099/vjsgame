@@ -180,6 +180,20 @@ class Vector {
     }
     //
     /**
+     * Returns a random 2D vector
+     *
+     * @return v - The Vector.
+     *
+     */
+    static random2D(min, max) {
+        let minCeiled = Math.ceil(min);
+        let maxFloored = Math.floor(max);
+        let x = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled);
+        let y = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled);
+        return new Vector(x, y);
+    }
+    //
+    /**
      * Vector to string
      *
      * @return v - The Vector to strig representation.
@@ -190,7 +204,6 @@ class Vector {
     }
 }
 class Body {
-    force;
     radius;
     isStatic;
     type;
@@ -200,6 +213,8 @@ class Body {
     accelaration;
     mass;
     restitution;
+    friction;
+    isGravity;
     color;
     width;
     height;
@@ -208,13 +223,14 @@ class Body {
     constructor(position, radius = 25, isStatic = false, color = 'rgba(33, 204, 113, 1)', mass = 1, shape = SHAPE.CIRCLE, lineWidth = 3, strokeStyle = '#ffff') {
         this.position = position;
         this.velocity = new Vector();
-        this.accelaration = new Vector(5, 3);
+        this.accelaration = new Vector(0, 0);
         this.radius = radius;
         this.mass = mass;
-        this.force = new Vector();
         this.shape = shape;
         this.isStatic = isStatic;
+        this.isGravity = false;
         this.restitution = 1;
+        this.friction = 0.98;
         this.color = color;
         this.type = 'na';
         this.lineWidth = lineWidth;
@@ -223,8 +239,18 @@ class Body {
         this.height = 40;
     }
     //
+    setGravity(isGravity) {
+        this.isGravity = isGravity;
+        if (isGravity) {
+            this.restitution = 0.7;
+        }
+        else {
+            this.restitution = 1;
+        }
+    }
+    //
     applyForce(force) {
-        this.force.add(force);
+        this.accelaration.add(force);
     }
     //
     draw(ctx) {
@@ -282,10 +308,32 @@ class PhysicsWorld {
     update(delataTime) {
         // update object
         this.objects.forEach((o) => {
+            //apply gravity
+            if (o.isGravity) {
+                o.applyForce(this.gravity);
+            }
             o.update(delataTime);
         });
         //
         this.checkWallCollision();
+        // collition
+        for (let i = 0; i < this.objects.length; i++) {
+            const body1 = this.objects.at(i);
+            for (let j = 1; i < this.objects.length; i++) {
+                const body2 = this.objects.at(j);
+                if (body1 != undefined && body2 != undefined) {
+                    if (body1.shape == SHAPE.CIRCLE && body2.shape == SHAPE.CIRCLE) {
+                        if (this.checkCircleToCircle(body1, body2)) {
+                            let mass1 = body1.mass * -1;
+                            let mass2 = body2.mass * -1;
+                            // body1.velocity.mult(mass1)
+                            // body2.velocity.mult(mass2)
+                            console.log('hit');
+                        }
+                    }
+                }
+            }
+        }
     }
     checkWallCollision() {
         for (let i = 0; i < this.objects.length; i++) {
@@ -301,7 +349,17 @@ class PhysicsWorld {
                     //
                     if (body.position.y > this.boundaries.h - body.radius ||
                         body.position.y <= body.radius) {
-                        body.velocity.y *= -body.restitution;
+                        if (body.isGravity) {
+                            // Friction
+                            if (body.position.y + body.radius >= this.boundaries.h) {
+                                body.position.y = this.boundaries.h - body.radius;
+                                body.velocity.y = -body.velocity.y * body.restitution;
+                                body.velocity.x *= body.friction;
+                            }
+                        }
+                        else {
+                            body.velocity.y *= -body.restitution;
+                        }
                     }
                 }
                 else if (body.shape == SHAPE.SQUARE) {
@@ -318,7 +376,7 @@ class PhysicsWorld {
             }
         }
     }
-    checkCircleRectCollision(circle, box) {
+    checkCircleToRectCollision(circle, box) {
         const closetX = Math.max(box.position.x, Math.min(circle.position.x, box.position.x + box.width));
         const closetY = Math.max(box.position.y, Math.min(circle.position.y, box.position.y + box.height));
         const distX = circle.position.x - closetX;
@@ -326,11 +384,19 @@ class PhysicsWorld {
         const distSqueared = distX * distX + distY * distY;
         return distSqueared < circle.radius * circle.radius;
     }
-    checkRectRectCollision(box1, box2) {
+    checkRectToRectCollision(box1, box2) {
         return (box1.position.x < box2.position.x + box2.width &&
             box1.position.x + box1.width > box2.position.x &&
             box1.position.y < box2.position.y + box2.height &&
             box1.position.y + box1.height > box2.position.y);
+    }
+    checkCircleToCircle(circle1, circle2) {
+        const dx = circle1.position.x - circle2.position.x;
+        const dy = circle1.position.y - circle2.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const radiiSum = circle1.radius + circle2.radius;
+        console.log(dist);
+        return dist <= radiiSum;
     }
 }
 //================================================MAIN====================================================================//
@@ -359,7 +425,7 @@ class Game {
         this.world = new PhysicsWorld({ x: 0, y: 0, w: this.width, h: this.height });
         this.world.addObjectToWorld(new Body(new Vector(250, 250), 15, false, '#45ff', 25, SHAPE.SQUARE));
         const body = new Body(new Vector(30, 50));
-        body.applyForce(new Vector(200, 300));
+        body.setGravity(true);
         this.world.addObjectToWorld(body);
         const body2 = new Body(new Vector(30, 50));
         body2.applyForce(new Vector(200, 300));
@@ -368,6 +434,23 @@ class Game {
         body2.color = 'rgba(239, 13, 239, 1)';
         body2.shape = SHAPE.SQUARE;
         this.world.addObjectToWorld(body2);
+        const body3 = new Body(new Vector(30, 50));
+        body3.applyForce(new Vector(3, 7));
+        body3.color = 'rgb(243, 21, 39)';
+        this.world.addObjectToWorld(body3);
+        //test
+        for (let i = 0; i < 4; i++) {
+            let position = Vector.random2D(this.world.boundaries.w, 50);
+            let b = new Body(position);
+            b.radius = 25; //this.getRandomInt(20)
+            b.color = this.getRandomColor();
+            b.mass = this.getRandomInt(20);
+            let x = this.getRandomInt(10);
+            let y = this.getRandomInt(15);
+            b.applyForce(new Vector(x, y));
+            this.world.addObjectToWorld(b);
+        }
+        console.log(`Count object: ${this.world.objectCount}`);
         // 3. Input Handling
         this.keys = new Set();
         this.initInput();
@@ -424,8 +507,16 @@ class Game {
         // Request next frame
         requestAnimationFrame(this.loop);
     }
-    togglePause() {
-        // Implementation of pause state logic
+    getRandomColor() {
+        const color = {
+            r: Math.floor(Math.random() * 256),
+            g: Math.floor(Math.random() * 256),
+            b: Math.floor(Math.random() * 256)
+        };
+        return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`;
+    }
+    getRandomInt(n) {
+        return Math.floor(Math.random() * n);
     }
     stop() {
         this.isRunning = false;
