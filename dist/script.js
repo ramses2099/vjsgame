@@ -1,5 +1,9 @@
 //=======================================================================================================================//
 const CANVAS_SIZE = { w: 800, h: 600 };
+const DEBUG = true;
+const log = (msg) => {
+    console.log(`[DEV] ${msg}`);
+};
 var SHAPE;
 (function (SHAPE) {
     SHAPE[SHAPE["CIRCLE"] = 0] = "CIRCLE";
@@ -399,6 +403,323 @@ class PhysicsWorld {
         return dist <= radiiSum;
     }
 }
+class Component {
+}
+class Position extends Component {
+    x;
+    y;
+    name = Position.name;
+    constructor(x, y) {
+        super();
+        this.x = x;
+        this.y = y;
+    }
+}
+class Size extends Component {
+    w;
+    h;
+    name = Size.name;
+    constructor(w, h) {
+        super();
+        this.w = w;
+        this.h = h;
+    }
+}
+class Sprite extends Component {
+    name = Sprite.name;
+    color;
+    lineWidth;
+    strokeStyle;
+    constructor(color = 'rgba(33, 204, 113, 1)', lineWidth = 3, strokeStyle = '#ffff') {
+        super();
+        this.color = color;
+        this.lineWidth = lineWidth;
+        this.strokeStyle = strokeStyle;
+    }
+}
+class Shape extends Component {
+    name = Shape.name;
+    shape;
+    constructor(shape = SHAPE.SQUARE) {
+        super();
+        this.shape = shape;
+    }
+}
+class Dimension extends Component {
+    name = Dimension.name;
+    x;
+    y;
+    w;
+    h;
+    constructor(w, h, x = 0, y = 0) {
+        super();
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+}
+class RectBody extends Component {
+    name = RectBody.name;
+    x;
+    y;
+    w;
+    h;
+    constructor(x, y, w = 64, h = 64) {
+        super();
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+}
+class CircBody extends Component {
+    name = CircBody.name;
+    x;
+    y;
+    r;
+    constructor(x, y, r = 25) {
+        super();
+        this.x = x;
+        this.y = y;
+        this.r = r;
+    }
+}
+class Physics extends Component {
+    name = Physics.name;
+    isStatic;
+    position;
+    velocity;
+    accelaration;
+    mass;
+    restitution;
+    friction;
+    isGravity;
+    constructor(isStatic = false, position = new Vector(0, 0), velocity = new Vector(0, 0), accelaration = new Vector(0, 0), mass = 1, restitution = 1, friction = 0.98, isGravity = true) {
+        super();
+        this.isStatic = isStatic;
+        this.position = position;
+        this.velocity = velocity;
+        this.accelaration = accelaration;
+        this.mass = mass;
+        this.restitution = restitution;
+        this.friction = friction;
+        this.isGravity = isGravity;
+    }
+}
+class System {
+    ecs;
+    constructor(ecs) {
+        this.ecs = ecs;
+    }
+}
+class RenderSystem extends System {
+    name = RenderSystem.name;
+    componentsRequired = new Set([Position, Size, Sprite, Shape]);
+    constructor(ecs) {
+        super(ecs);
+    }
+    update(entities, deltaTime) { }
+    draw(entities, ctx) {
+        for (let entity of entities) {
+            let compos = this.ecs.getComponents(entity);
+            if (compos.hasAll(this.componentsRequired)) {
+                let pos = compos.get(Position.name);
+                let size = compos.get(Size.name);
+                let sprite = compos.get(Sprite.name);
+                let sh = compos.get(Shape.name);
+                if (sh.shape == SHAPE.CIRCLE) {
+                    let body = compos.get(CircBody.name);
+                    if (body) {
+                        if (ctx != null) {
+                            ctx.fillStyle = sprite.color;
+                            ctx.beginPath();
+                            ctx.arc(pos.x, pos.y, body.r, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.strokeStyle = sprite.strokeStyle;
+                            ctx.lineWidth = sprite.lineWidth;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                else if (sh.shape == SHAPE.SQUARE) {
+                    let body = compos.get(RectBody.name);
+                    if (body) {
+                        if (ctx != null) {
+                            ctx.fillStyle = sprite.color;
+                            ctx.fillRect(pos.x, pos.y, size.w, size.h);
+                            ctx.strokeStyle = sprite.strokeStyle;
+                            ctx.lineWidth = sprite.lineWidth;
+                            ctx.strokeRect(pos.x, pos.y, size.w, size.h);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+class GravitySystem extends System {
+    name = RenderSystem.name;
+    componentsRequired = new Set([
+        Position,
+        Size,
+        Shape,
+        Physics,
+        Dimension
+    ]);
+    constructor(ecs) {
+        super(ecs);
+    }
+    update(entities, deltaTime) {
+        for (let entity of entities) {
+            let compos = this.ecs.getComponents(entity);
+            if (compos.hasAll(this.componentsRequired)) {
+                let pos = compos.get(Position.name);
+                let size = compos.get(Size.name);
+                let sh = compos.get(Shape.name);
+                if (sh.shape == SHAPE.CIRCLE) {
+                    let body = compos.get(CircBody.name);
+                    if (body) {
+                    }
+                }
+                else if (sh.shape == SHAPE.SQUARE) {
+                    let body = compos.get(RectBody.name);
+                    if (body) {
+                        let bPhysics = compos.get(Physics.name);
+                        if (bPhysics.isStatic)
+                            return;
+                        if (bPhysics.isGravity) {
+                            let dims = compos.get(Dimension.name);
+                            bPhysics.accelaration.mult(deltaTime);
+                            bPhysics.velocity.add(bPhysics.accelaration);
+                            bPhysics.position.add(bPhysics.velocity);
+                            //update position // Gravity
+                            pos.y += bPhysics.position.y;
+                            // Friction
+                            if (pos.y + size.h >= dims.h) {
+                                pos.y = dims.h - size.h;
+                                bPhysics.velocity.y = -bPhysics.velocity.y * bPhysics.restitution;
+                                bPhysics.velocity.x *= bPhysics.friction;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    draw(entities, ctx) { }
+}
+class ComponentContainer {
+    map = new Map();
+    add(component) {
+        this.map.set(component.name, component);
+    }
+    get(componetName) {
+        return this.map.get(componetName);
+    }
+    getAll() {
+        return this.map.values();
+    }
+    has(componet) {
+        return this.map.has(componet.name);
+    }
+    hasAll(components) {
+        for (let comp of components) {
+            if (!this.map.has(comp.name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    delete(componetName) {
+        this.map.delete(componetName);
+    }
+}
+class ECS {
+    entities = new Map();
+    systems = new Map();
+    nextEntityID = 0;
+    entitiesToDestroy = new Array();
+    addEntity() {
+        let entity = this.nextEntityID;
+        this.nextEntityID++;
+        this.entities.set(entity, new ComponentContainer());
+        return entity;
+    }
+    removeEntity(entity) {
+        this.entitiesToDestroy.push(entity);
+    }
+    addComponent(entity, component) {
+        this.entities.get(entity)?.add(component);
+        this.checkE(entity);
+    }
+    getComponents(entity) {
+        return this.entities.get(entity);
+    }
+    removeComponent(entity, component) {
+        this.entities.get(entity)?.delete(component.name);
+        this.checkE(entity);
+    }
+    addSystem(system) {
+        if (system.componentsRequired.size == 0) {
+            console.warn('System no added: empty Component list');
+            console.warn(system);
+            return;
+        }
+        this.systems.set(system, new Set());
+        for (let entity of this.entities.keys()) {
+            this.checkES(entity, system);
+        }
+    }
+    removeSystem(system) {
+        this.systems.delete(system);
+    }
+    update(deltaTime) {
+        for (let [system, entities] of this.systems.entries()) {
+            system.update(entities, deltaTime);
+        }
+        while (this.entitiesToDestroy.length > 0) {
+            this.destroyEntity(this.entitiesToDestroy.pop());
+        }
+    }
+    draw(ctx) {
+        for (let [system, entities] of this.systems.entries()) {
+            system.draw(entities, ctx);
+        }
+    }
+    logEntity(entity) {
+        log(`Entity id: ${entity}`);
+        let comps = this.getComponents(entity);
+        for (const comp of comps.getAll()) {
+            log(`Entity id: ${entity} has a compontent ${comp.name}`);
+        }
+        for (const syst of this.systems.keys()) {
+            log(`ECS: has a system ${syst.name}`);
+        }
+    }
+    destroyEntity(entity) {
+        this.entities.delete(entity);
+        for (let entities of this.systems.values()) {
+            entities.delete(entity);
+        }
+    }
+    checkE(entity) {
+        for (let system of this.systems.keys()) {
+            this.checkES(entity, system);
+        }
+    }
+    checkES(entity, system) {
+        let have = this.entities.get(entity);
+        let need = system.componentsRequired;
+        if (have?.hasAll(need)) {
+            this.systems.get(system)?.add(entity);
+        }
+        else {
+            this.systems.get(system)?.delete(entity);
+        }
+    }
+}
+//======================================================ECS=================================================================//
 //================================================MAIN====================================================================//
 class Game {
     canvas;
@@ -406,6 +727,7 @@ class Game {
     // Set display dimensions
     width;
     height;
+    //world: PhysicsWorld
     world;
     // 2. Game State Tracking
     isRunning;
@@ -421,36 +743,19 @@ class Game {
         // 2. Game State Tracking
         this.isRunning = false;
         this.lastTime = 0;
-        // Object
-        this.world = new PhysicsWorld({ x: 0, y: 0, w: this.width, h: this.height });
-        this.world.addObjectToWorld(new Body(new Vector(250, 250), 15, false, '#45ff', 25, SHAPE.SQUARE));
-        const body = new Body(new Vector(30, 50));
-        body.setGravity(true);
-        this.world.addObjectToWorld(body);
-        const body2 = new Body(new Vector(30, 50));
-        body2.applyForce(new Vector(200, 300));
-        body2.isStatic = true;
-        body2.width = 350;
-        body2.color = 'rgba(239, 13, 239, 1)';
-        body2.shape = SHAPE.SQUARE;
-        this.world.addObjectToWorld(body2);
-        const body3 = new Body(new Vector(30, 50));
-        body3.applyForce(new Vector(3, 7));
-        body3.color = 'rgb(243, 21, 39)';
-        this.world.addObjectToWorld(body3);
-        //test
-        for (let i = 0; i < 4; i++) {
-            let position = Vector.random2D(this.world.boundaries.w, 50);
-            let b = new Body(position);
-            b.radius = 25; //this.getRandomInt(20)
-            b.color = this.getRandomColor();
-            b.mass = this.getRandomInt(20);
-            let x = this.getRandomInt(10);
-            let y = this.getRandomInt(15);
-            b.applyForce(new Vector(x, y));
-            this.world.addObjectToWorld(b);
-        }
-        console.log(`Count object: ${this.world.objectCount}`);
+        this.world = new ECS();
+        this.world.addSystem(new RenderSystem(this.world));
+        this.world.addSystem(new GravitySystem(this.world));
+        let entity = this.world.addEntity();
+        this.world.addComponent(entity, new Position(250, 50));
+        this.world.addComponent(entity, new Size(32, 32));
+        this.world.addComponent(entity, new Sprite());
+        this.world.addComponent(entity, new Shape());
+        //this.world.addComponent(entity, new Shape(SHAPE.CIRCLE))
+        this.world.addComponent(entity, new RectBody(25, 25, 32, 32));
+        //this.world.addComponent(entity, new CircBody(250,250,30))
+        this.world.addComponent(entity, new Dimension(CANVAS_SIZE.w, CANVAS_SIZE.h));
+        //this.world.addComponent(entity, new Physics(false, new Vector(25, 25)))
         // 3. Input Handling
         this.keys = new Set();
         this.initInput();
@@ -500,8 +805,12 @@ class Game {
             this.ctx.fillStyle = '#1a1a2e';
             this.ctx?.fillRect(0, 0, this.width, this.height);
             // update object
-            this.world.update(cappedDt);
+            //this.world.update(cappedDt)
             // Draw object
+            //this.world.draw(this.ctx)
+            // update ECS
+            this.world.update(cappedDt);
+            // draw ECS
             this.world.draw(this.ctx);
         }
         // Request next frame

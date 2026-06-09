@@ -1,5 +1,10 @@
 //=======================================================================================================================//
 const CANVAS_SIZE = { w: 800, h: 600 } as const
+const DEBUG: boolean = true
+
+const log = <T>(msg: T): void => {
+  console.log(`[DEV] ${msg}`)
+}
 
 enum SHAPE {
   CIRCLE,
@@ -28,7 +33,7 @@ class Vector {
   x: number
   y: number
 
-  constructor (x: number = 0, y: number = 0) {
+  constructor(x: number = 0, y: number = 0) {
     this.x = x
     this.y = y
   }
@@ -38,7 +43,7 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  add (v: Vector): void {
+  add(v: Vector): void {
     this.x = this.x + v.x
     this.y = this.y + v.y
   }
@@ -49,7 +54,7 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  sub (v: Vector): void {
+  sub(v: Vector): void {
     this.x = this.x + v.x
     this.y = this.y + v.y
   }
@@ -60,7 +65,7 @@ class Vector {
    * @param n - The number.
    *
    */
-  mult (n: number): void {
+  mult(n: number): void {
     this.x = this.x * n
     this.y = this.y * n
   }
@@ -71,7 +76,7 @@ class Vector {
    * @param n - The number.
    *
    */
-  div (n: number): void {
+  div(n: number): void {
     this.x = this.x / n
     this.y = this.y / n
   }
@@ -83,7 +88,7 @@ class Vector {
    * @returns number
    *
    */
-  mag (): number {
+  mag(): number {
     return Math.sqrt(Math.pow(this.x, 2) + Math.pow(this.y, 2))
   }
   //
@@ -94,7 +99,7 @@ class Vector {
    * @returns number
    *
    */
-  lenghtSq (): number {
+  lenghtSq(): number {
     return Math.pow(this.x, 2) + Math.pow(this.y, 2)
   }
   //
@@ -102,7 +107,7 @@ class Vector {
    * Normalizes this vector to a unit length of 1
    *
    */
-  normalize (): void {
+  normalize(): void {
     let m = this.mag()
     if (m > 0) {
       this.div(m)
@@ -116,7 +121,7 @@ class Vector {
    *
    * @returns number
    */
-  limit (max: number): void {
+  limit(max: number): void {
     const length = this.mag()
     if (length > max && length > 0) {
       this.x = (this.x / length) * max
@@ -130,7 +135,7 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  dist (v: Vector): number {
+  dist(v: Vector): number {
     return Math.hypot(v.x - this.x, v.y - this.y)
   }
   //
@@ -140,7 +145,7 @@ class Vector {
    * @param v - The Vector.
    * @returns number
    */
-  dot (v: Vector): number {
+  dot(v: Vector): number {
     return this.x * v.x + this.y * v.y
   }
   //
@@ -150,7 +155,7 @@ class Vector {
    * @return v - The Vector.
    *
    */
-  copy (): Vector {
+  copy(): Vector {
     return new Vector(this.x, this.y)
   }
   //
@@ -160,7 +165,7 @@ class Vector {
    * @return v - The Vector.
    *
    */
-  random2D (): Vector {
+  random2D(): Vector {
     const angle = Math.random() * Math.PI * 2
     return new Vector(Math.cos(angle), Math.sin(angle))
   }
@@ -171,7 +176,7 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  static sub (v1: Vector, v2: Vector): Vector {
+  static sub(v1: Vector, v2: Vector): Vector {
     return new Vector(v1.x - v2.x, v1.y - v2.y)
   }
   //
@@ -181,7 +186,7 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  static add (v1: Vector, v2: Vector): Vector {
+  static add(v1: Vector, v2: Vector): Vector {
     return new Vector(v1.x + v2.x, v1.y + v2.y)
   }
   //
@@ -191,11 +196,11 @@ class Vector {
    * @param v - The Vector.
    *
    */
-  static dot (v1: Vector, v2: Vector): number {
+  static dot(v1: Vector, v2: Vector): number {
     return v1.x * v2.x + v1.y * v2.y
   }
   //
-  static mult (v1: Vector, n: number): Vector {
+  static mult(v1: Vector, n: number): Vector {
     return new Vector(v1.x * n, v1.y * n)
   }
   //
@@ -205,7 +210,7 @@ class Vector {
    * @return v - The Vector.
    *
    */
-  static random2D (min: number, max: number): Vector {
+  static random2D(min: number, max: number): Vector {
     let minCeiled = Math.ceil(min)
     let maxFloored = Math.floor(max)
     let x = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled)
@@ -220,7 +225,7 @@ class Vector {
    * @return v - The Vector to strig representation.
    *
    */
-  toString (): string {
+  toString(): string {
     return `{x: ${this.x}, y: ${this.y}}`
   }
 }
@@ -243,7 +248,7 @@ class Body implements GameObject {
   lineWidth: number
   strokeStyle: string
 
-  constructor (
+  constructor(
     position: Vector,
     radius: number = 25,
     isStatic: boolean = false,
@@ -271,7 +276,7 @@ class Body implements GameObject {
     this.height = 40
   }
   //
-  setGravity (isGravity: boolean): void {
+  setGravity(isGravity: boolean): void {
     this.isGravity = isGravity
     if (isGravity) {
       this.restitution = 0.7
@@ -281,11 +286,11 @@ class Body implements GameObject {
   }
 
   //
-  applyForce (force: Vector) {
+  applyForce(force: Vector) {
     this.accelaration.add(force)
   }
   //
-  draw (ctx: CanvasRenderingContext2D | null): void {
+  draw(ctx: CanvasRenderingContext2D | null): void {
     if (this.shape == SHAPE.CIRCLE) {
       if (ctx != null) {
         ctx.fillStyle = this.color
@@ -312,7 +317,7 @@ class Body implements GameObject {
     }
   }
   //
-  update (delataTime: number): void {
+  update(delataTime: number): void {
     if (this.isStatic) return
 
     this.accelaration.mult(delataTime)
@@ -328,26 +333,26 @@ class PhysicsWorld {
   gravity: Vector
   objectCount: number
 
-  constructor (boundaries: Boundaries, gravity: Vector = new Vector(0, 10.0)) {
+  constructor(boundaries: Boundaries, gravity: Vector = new Vector(0, 10.0)) {
     this.objects = new Array<Body>()
     this.boundaries = boundaries
     this.gravity = gravity
     this.objectCount = 0
   }
 
-  addObjectToWorld (obj: Body): void {
+  addObjectToWorld(obj: Body): void {
     this.objects.push(obj)
     this.objectCount++
   }
 
-  draw (ctx: CanvasRenderingContext2D | null): void {
+  draw(ctx: CanvasRenderingContext2D | null): void {
     // Draw object
     this.objects.forEach((o: Body) => {
       o.draw(ctx)
     })
   }
 
-  update (delataTime: number): void {
+  update(delataTime: number): void {
     // update object
     this.objects.forEach((o: Body) => {
       //apply gravity
@@ -378,7 +383,7 @@ class PhysicsWorld {
     }
   }
 
-  checkWallCollision () {
+  checkWallCollision() {
     for (let i = 0; i < this.objects.length; i++) {
       const body = this.objects.at(i)
       if (body != undefined) {
@@ -426,7 +431,7 @@ class PhysicsWorld {
     }
   }
 
-  checkCircleToRectCollision (circle: Body, box: Body): boolean {
+  checkCircleToRectCollision(circle: Body, box: Body): boolean {
     const closetX = Math.max(
       box.position.x,
       Math.min(circle.position.x, box.position.x + box.width)
@@ -442,7 +447,7 @@ class PhysicsWorld {
     return distSqueared < circle.radius * circle.radius
   }
 
-  checkRectToRectCollision (box1: Body, box2: Body): boolean {
+  checkRectToRectCollision(box1: Body, box2: Body): boolean {
     return (
       box1.position.x < box2.position.x + box2.width &&
       box1.position.x + box1.width > box2.position.x &&
@@ -451,7 +456,7 @@ class PhysicsWorld {
     )
   }
 
-  checkCircleToCircle (circle1: Body, circle2: Body): boolean {
+  checkCircleToCircle(circle1: Body, circle2: Body): boolean {
     const dx = circle1.position.x - circle2.position.x
     const dy = circle1.position.y - circle2.position.y
 
@@ -463,6 +468,392 @@ class PhysicsWorld {
   }
 }
 
+//======================================================ECS=================================================================//
+type Entity = number
+
+abstract class Component {
+  public abstract name: string
+}
+
+class Position extends Component {
+  name: string = Position.name
+  constructor(public x: number, public y: number) {
+    super()
+  }
+}
+
+class Size extends Component {
+  name: string = Size.name
+  constructor(public w: number, public h: number) {
+    super()
+  }
+}
+
+class Sprite extends Component {
+  name: string = Sprite.name
+  color: string
+  lineWidth: number
+  strokeStyle: string
+
+  constructor(
+    color: string = 'rgba(33, 204, 113, 1)',
+    lineWidth: number = 3,
+    strokeStyle: string = '#ffff'
+  ) {
+    super()
+    this.color = color
+    this.lineWidth = lineWidth
+    this.strokeStyle = strokeStyle
+  }
+}
+
+class Shape extends Component {
+  name: string = Shape.name
+  shape: SHAPE
+
+  constructor(shape: SHAPE = SHAPE.SQUARE) {
+    super()
+    this.shape = shape
+  }
+}
+
+class Dimension extends Component {
+  name: string = Dimension.name
+  x: number
+  y: number
+  w: number
+  h: number
+
+  constructor(w: number, h: number, x: number = 0, y: number = 0) {
+    super()
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
+}
+
+class RectBody extends Component {
+  name: string = RectBody.name
+  x: number
+  y: number
+  w: number
+  h: number
+
+  constructor(x: number, y: number, w: number = 64, h: number = 64) {
+    super()
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
+}
+
+class CircBody extends Component {
+  name: string = CircBody.name
+  x: number
+  y: number
+  r: number
+
+  constructor(x: number, y: number, r: number = 25) {
+    super()
+    this.x = x
+    this.y = y
+    this.r = r
+  }
+}
+
+class Physics extends Component {
+  name: string = Physics.name
+  isStatic: boolean
+  position: Vector
+  velocity: Vector
+  accelaration: Vector
+  mass: number
+  restitution: number
+  friction: number
+  isGravity: boolean
+
+  constructor(
+    isStatic: boolean = false,
+    position: Vector = new Vector(0, 0),
+    velocity: Vector = new Vector(0, 0),
+    accelaration: Vector = new Vector(0, 0),
+    mass: number = 1,
+    restitution: number = 1,
+    friction: number = 0.98,
+    isGravity: boolean = true
+  ) {
+    super()
+    this.isStatic = isStatic
+    this.position = position
+    this.velocity = velocity
+    this.accelaration = accelaration
+    this.mass = mass
+    this.restitution = restitution
+    this.friction = friction
+    this.isGravity = isGravity
+  }
+}
+
+abstract class System {
+  ecs: ECS
+  public abstract name: string
+  public abstract componentsRequired: Set<Component>
+  constructor(ecs: ECS) {
+    this.ecs = ecs
+  }
+  public abstract update(entities: Set<Entity>, deltaTime: number): void
+  public abstract draw(
+    entities: Set<Entity>,
+    ctx: CanvasRenderingContext2D | null
+  ): void
+}
+
+class RenderSystem extends System {
+  name: string = RenderSystem.name
+  componentsRequired = new Set<Component>([Position, Size, Sprite, Shape])
+
+  constructor(ecs: ECS) {
+    super(ecs)
+  }
+
+  update(entities: Set<Entity>, deltaTime: number): void {}
+  draw(entities: Set<Entity>, ctx: CanvasRenderingContext2D | null): void {
+    for (let entity of entities) {
+      let compos = this.ecs.getComponents(entity)
+      if (compos.hasAll(this.componentsRequired)) {
+        let pos = compos.get<Position>(Position.name)
+        let size = compos.get<Size>(Size.name)
+        let sprite = compos.get<Sprite>(Sprite.name)
+        let sh = compos.get<Shape>(Shape.name)
+
+        if (sh.shape == SHAPE.CIRCLE) {
+          let body = compos.get<CircBody>(CircBody.name)
+          if (body) {
+            if (ctx != null) {
+              ctx.fillStyle = sprite.color
+              ctx.beginPath()
+              ctx.arc(pos.x, pos.y, body.r, 0, 2 * Math.PI)
+              ctx.fill()
+              ctx.strokeStyle = sprite.strokeStyle
+              ctx.lineWidth = sprite.lineWidth
+              ctx.stroke()
+            }
+          }
+        } else if (sh.shape == SHAPE.SQUARE) {
+          let body = compos.get<RectBody>(RectBody.name)
+          if (body) {
+            if (ctx != null) {
+              ctx.fillStyle = sprite.color
+              ctx.fillRect(pos.x, pos.y, size.w, size.h)
+              ctx.strokeStyle = sprite.strokeStyle
+              ctx.lineWidth = sprite.lineWidth
+              ctx.strokeRect(pos.x, pos.y, size.w, size.h)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+class GravitySystem extends System {
+  name: string = RenderSystem.name
+  componentsRequired = new Set<Component>([
+    Position,
+    Size,
+    Shape,
+    Physics,
+    Dimension
+  ])
+
+  constructor(ecs: ECS) {
+    super(ecs)
+  }
+
+  update(entities: Set<Entity>, deltaTime: number): void {
+    for (let entity of entities) {
+      let compos = this.ecs.getComponents(entity)
+      if (compos.hasAll(this.componentsRequired)) {
+        let pos = compos.get<Position>(Position.name)
+        let size = compos.get<Size>(Size.name)
+        let sh = compos.get<Shape>(Shape.name)
+
+        if (sh.shape == SHAPE.CIRCLE) {
+          let body = compos.get<CircBody>(CircBody.name)
+          if (body) {
+          }
+        } else if (sh.shape == SHAPE.SQUARE) {
+          let body = compos.get<RectBody>(RectBody.name)
+          if (body) {
+            let bPhysics = compos.get<Physics>(Physics.name)
+            if (bPhysics.isStatic) return
+
+            if (bPhysics.isGravity) {
+              let dims = compos.get<Dimension>(Dimension.name)
+          
+              bPhysics.accelaration.mult(deltaTime)
+              bPhysics.velocity.add(bPhysics.accelaration)
+              bPhysics.position.add(bPhysics.velocity)
+
+              //update position // Gravity
+              pos.y += bPhysics.position.y
+
+               // Friction
+              if (pos.y + size.h >= dims.h) {
+                pos.y = dims.h - size.h
+                bPhysics.velocity.y = -bPhysics.velocity.y * bPhysics.restitution
+                bPhysics.velocity.x *= bPhysics.friction
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  draw(entities: Set<Entity>, ctx: CanvasRenderingContext2D | null): void {}
+}
+
+class ComponentContainer {
+  private map = new Map<string, Component>()
+
+  public add<T extends Component>(component: T): void {
+    this.map.set(component.name, component)
+  }
+
+  public get<T extends Component>(componetName: string): T {
+    return this.map.get(componetName) as T
+  }
+
+  public getAll(): MapIterator<Component> {
+    return this.map.values()
+  }
+
+  public has<T extends Component>(componet: T): boolean {
+    return this.map.has(componet.name)
+  }
+
+  public hasAll(components: Set<Component>): boolean {
+    for (let comp of components) {
+      if (!this.map.has(comp.name)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  public delete(componetName: string): void {
+    this.map.delete(componetName)
+  }
+}
+
+class ECS {
+  private entities = new Map<Entity, ComponentContainer>()
+  private systems = new Map<System, Set<Entity>>()
+
+  private nextEntityID = 0
+  private entitiesToDestroy = new Array<Entity>()
+
+  public addEntity(): Entity {
+    let entity = this.nextEntityID
+    this.nextEntityID++
+    this.entities.set(entity, new ComponentContainer())
+    return entity
+  }
+
+  public removeEntity(entity: Entity): void {
+    this.entitiesToDestroy.push(entity)
+  }
+
+  public addComponent<T extends Component>(entity: Entity, component: T): void {
+    this.entities.get(entity)?.add(component)
+    this.checkE(entity)
+  }
+
+  public getComponents(entity: Entity): ComponentContainer {
+    return this.entities.get(entity) as ComponentContainer
+  }
+
+  public removeComponent<T extends Component>(
+    entity: Entity,
+    component: T
+  ): void {
+    this.entities.get(entity)?.delete(component.name)
+    this.checkE(entity)
+  }
+
+  public addSystem<T extends System>(system: T): void {
+    if (system.componentsRequired.size == 0) {
+      console.warn('System no added: empty Component list')
+      console.warn(system)
+      return
+    }
+
+    this.systems.set(system, new Set())
+    for (let entity of this.entities.keys()) {
+      this.checkES(entity, system)
+    }
+  }
+
+  public removeSystem<T extends System>(system: T): void {
+    this.systems.delete(system)
+  }
+
+  public update(deltaTime: number): void {
+    for (let [system, entities] of this.systems.entries()) {
+      system.update(entities, deltaTime)
+    }
+
+    while (this.entitiesToDestroy.length > 0) {
+      this.destroyEntity(this.entitiesToDestroy.pop() as Entity)
+    }
+  }
+
+  public draw(ctx: CanvasRenderingContext2D | null): void {
+    for (let [system, entities] of this.systems.entries()) {
+      system.draw(entities, ctx)
+    }
+  }
+
+  public logEntity(entity: Entity): void {
+    log<string>(`Entity id: ${entity}`)
+    let comps = this.getComponents(entity)
+    for (const comp of comps.getAll()) {
+      log<string>(`Entity id: ${entity} has a compontent ${comp.name}`)
+    }
+    for (const syst of this.systems.keys()) {
+      log<string>(`ECS: has a system ${syst.name}`)
+    }
+  }
+
+  private destroyEntity(entity: Entity): void {
+    this.entities.delete(entity)
+    for (let entities of this.systems.values()) {
+      entities.delete(entity)
+    }
+  }
+
+  private checkE(entity: Entity): void {
+    for (let system of this.systems.keys()) {
+      this.checkES(entity, system)
+    }
+  }
+
+  private checkES(entity: Entity, system: System): void {
+    let have = this.entities.get(entity)
+    let need = system.componentsRequired
+
+    if (have?.hasAll(need)) {
+      this.systems.get(system)?.add(entity)
+    } else {
+      this.systems.get(system)?.delete(entity)
+    }
+  }
+}
+
+//======================================================ECS=================================================================//
+
 //================================================MAIN====================================================================//
 class Game {
   canvas: HTMLCanvasElement | null
@@ -472,7 +863,8 @@ class Game {
   width: number
   height: number
 
-  world: PhysicsWorld
+  //world: PhysicsWorld
+  world: ECS
 
   // 2. Game State Tracking
   isRunning: boolean
@@ -480,7 +872,7 @@ class Game {
 
   keys: Set<string>
 
-  constructor (canvasId: string) {
+  constructor(canvasId: string) {
     // 1. Initialize Canvas and Context
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement
     this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D
@@ -493,44 +885,20 @@ class Game {
     this.isRunning = false
     this.lastTime = 0
 
-    // Object
-    this.world = new PhysicsWorld({ x: 0, y: 0, w: this.width, h: this.height })
-    this.world.addObjectToWorld(
-      new Body(new Vector(250, 250), 15, false, '#45ff', 25, SHAPE.SQUARE)
-    )
+    this.world = new ECS()
+    this.world.addSystem(new RenderSystem(this.world))
+    this.world.addSystem(new GravitySystem(this.world))
 
-    const body = new Body(new Vector(30, 50))
-    body.setGravity(true)
-    this.world.addObjectToWorld(body)
-
-    const body2 = new Body(new Vector(30, 50))
-    body2.applyForce(new Vector(200, 300))
-    body2.isStatic = true
-    body2.width = 350
-    body2.color = 'rgba(239, 13, 239, 1)'
-    body2.shape = SHAPE.SQUARE
-    this.world.addObjectToWorld(body2)
-
-    const body3 = new Body(new Vector(30, 50))
-    body3.applyForce(new Vector(3, 7))
-    body3.color = 'rgb(243, 21, 39)'
-
-    this.world.addObjectToWorld(body3)
-
-    //test
-    for (let i = 0; i < 4; i++) {
-      let position: Vector = Vector.random2D(this.world.boundaries.w, 50)
-      let b = new Body(position)
-      b.radius = 25 //this.getRandomInt(20)
-      b.color = this.getRandomColor()
-      b.mass = this.getRandomInt(20)
-      let x = this.getRandomInt(10)
-      let y = this.getRandomInt(15)
-      b.applyForce(new Vector(x, y))
-
-      this.world.addObjectToWorld(b)
-    }
-    console.log(`Count object: ${this.world.objectCount}`)
+    let entity = this.world.addEntity()
+    this.world.addComponent(entity, new Position(250, 50))
+    this.world.addComponent(entity, new Size(32, 32))
+    this.world.addComponent(entity, new Sprite())
+    this.world.addComponent(entity, new Shape())
+    //this.world.addComponent(entity, new Shape(SHAPE.CIRCLE))
+    this.world.addComponent(entity, new RectBody(25, 25, 32, 32))
+    //this.world.addComponent(entity, new CircBody(250,250,30))
+    this.world.addComponent(entity, new Dimension(CANVAS_SIZE.w, CANVAS_SIZE.h))
+    //this.world.addComponent(entity, new Physics(false, new Vector(25, 25)))
 
     // 3. Input Handling
     this.keys = new Set<string>()
@@ -541,7 +909,7 @@ class Game {
   }
 
   // Set up global event listeners for controls
-  initInput (): void {
+  initInput(): void {
     window.addEventListener('keydown', e => {
       this.keys.add(e.code)
       // Prevent scrolling with space/arrow keys
@@ -554,7 +922,7 @@ class Game {
   }
 
   // Entry point to start the game
-  start (): void {
+  start(): void {
     if (this.isRunning) return
     this.isRunning = true
     this.lastTime = performance.now()
@@ -567,13 +935,13 @@ class Game {
     console.log('Game started successfully.')
   }
 
-  initLevel () {
+  initLevel() {
     // Placeholder for entity instantiation
     // e.g., this.entities.push(new Player(this));
   }
 
   // The Main Game Loop running at ~60fps
-  loop (timeStamp: number): void {
+  loop(timeStamp: number): void {
     if (!this.isRunning) return
 
     // Calculate Delta Time (dt) in seconds
@@ -591,9 +959,15 @@ class Game {
       this.ctx?.fillRect(0, 0, this.width, this.height)
 
       // update object
-      this.world.update(cappedDt)
+      //this.world.update(cappedDt)
 
       // Draw object
+      //this.world.draw(this.ctx)
+
+      // update ECS
+      this.world.update(cappedDt)
+
+      // draw ECS
       this.world.draw(this.ctx)
     }
 
@@ -601,7 +975,7 @@ class Game {
     requestAnimationFrame(this.loop)
   }
 
-  getRandomColor (): string {
+  getRandomColor(): string {
     const color: RGBColor = {
       r: Math.floor(Math.random() * 256),
       g: Math.floor(Math.random() * 256),
@@ -611,11 +985,11 @@ class Game {
     return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`
   }
 
-  getRandomInt (n: number): number {
+  getRandomInt(n: number): number {
     return Math.floor(Math.random() * n)
   }
 
-  stop () {
+  stop() {
     this.isRunning = false
   }
 }
