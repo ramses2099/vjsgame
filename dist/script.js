@@ -208,518 +208,204 @@ class Vector {
     }
 }
 class Body {
-    radius;
-    isStatic;
-    type;
-    shape;
     position;
     velocity;
-    accelaration;
-    mass;
-    restitution;
-    friction;
-    isGravity;
-    color;
-    width;
-    height;
-    lineWidth;
-    strokeStyle;
-    constructor(position, radius = 25, isStatic = false, color = 'rgba(33, 204, 113, 1)', mass = 1, shape = SHAPE.CIRCLE, lineWidth = 3, strokeStyle = '#ffff') {
-        this.position = position;
+    acceleration;
+    size;
+    shape;
+    radius;
+    isStatic;
+    constructor() {
+        this.position = new Vector();
+        this.size = { w: 32, h: 32 };
         this.velocity = new Vector();
-        this.accelaration = new Vector(0, 0);
-        this.radius = radius;
-        this.mass = mass;
-        this.shape = shape;
-        this.isStatic = isStatic;
-        this.isGravity = false;
-        this.restitution = 1;
-        this.friction = 0.98;
-        this.color = color;
-        this.type = 'na';
-        this.lineWidth = lineWidth;
-        this.strokeStyle = strokeStyle;
-        this.width = 40;
-        this.height = 40;
+        this.acceleration = new Vector();
+        this.shape = SHAPE.CIRCLE;
+        this.radius = 25;
+        this.isStatic = false;
     }
-    //
-    setGravity(isGravity) {
-        this.isGravity = isGravity;
-        if (isGravity) {
-            this.restitution = 0.7;
-        }
-        else {
-            this.restitution = 1;
-        }
-    }
-    //
     applyForce(force) {
-        this.accelaration.add(force);
+        this.acceleration.add(force);
+    }
+}
+class CollisionSystem {
+    static checkCircleCollision(a, b) {
+        const ax = a.position.x + a.size.w / 2;
+        const ay = a.position.y + a.size.h / 2;
+        const bx = b.position.x + b.size.w / 2;
+        const by = b.position.y + b.size.h / 2;
+        const dx = ax - bx;
+        const dy = ay - by;
+        const distSq = dx * dx + dy * dy;
+        const radSum = a.radius + b.radius;
+        return distSq < radSum * radSum;
     }
     //
+    static checkCircleCollisionBoundaries(body, boundaries) {
+        if (body.isStatic)
+            return;
+        if (body.shape == SHAPE.CIRCLE) {
+            if (body.position.x > boundaries.w - body.radius ||
+                body.position.x <= body.radius) {
+                body.velocity.x *= -1;
+            }
+            //
+            if (body.position.y > boundaries.h - body.radius ||
+                body.position.y <= body.radius) {
+                body.velocity.y *= -1;
+            }
+        }
+        else if (body.shape == SHAPE.SQUARE) {
+            if (body.position.x > boundaries.w - body.size.w ||
+                body.position.x <= boundaries.x) {
+                body.velocity.x *= -1;
+            }
+            //
+            if (body.position.y > boundaries.h - body.size.h ||
+                body.position.y <= boundaries.y) {
+                body.velocity.y *= -1;
+            }
+        }
+    }
+}
+class Player {
+    body;
+    lineWidth;
+    color;
+    strokeStyle;
+    constructor(x, y) {
+        this.body = new Body();
+        this.body.position = new Vector(x, y);
+        this.color = 'rgb(50, 66, 241)';
+        this.lineWidth = 5;
+        this.strokeStyle = 'rgb(243, 243, 248)';
+    }
+    update(delataTime) {
+        if (this.body.isStatic)
+            return;
+        this.body.acceleration.mult(delataTime);
+        this.body.velocity.add(this.body.acceleration);
+        this.body.position.add(this.body.velocity);
+    }
     draw(ctx) {
-        if (this.shape == SHAPE.CIRCLE) {
+        if (this.body.shape == SHAPE.CIRCLE) {
             if (ctx != null) {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
-                ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+                ctx.arc(this.body.position.x, this.body.position.y, this.body.radius, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.strokeStyle = this.strokeStyle;
                 ctx.lineWidth = this.lineWidth;
                 ctx.stroke();
             }
         }
-        else if (this.shape == SHAPE.SQUARE) {
+        else if (this.body.shape == SHAPE.SQUARE) {
             if (ctx != null) {
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.position.x, this.position.y, this.width, this.height);
+                ctx.fillRect(this.body.position.x, this.body.position.y, this.body.size.w, this.body.size.h);
                 ctx.strokeStyle = this.strokeStyle;
                 ctx.lineWidth = this.lineWidth;
-                ctx.strokeRect(this.position.x, this.position.y, this.width, this.height);
+                ctx.strokeRect(this.body.position.x, this.body.position.y, this.body.size.w, this.body.size.h);
             }
         }
     }
-    //
-    update(delataTime) {
-        if (this.isStatic)
-            return;
-        this.accelaration.mult(delataTime);
-        this.velocity.add(this.accelaration);
-        this.position.add(this.velocity);
-    }
 }
-class PhysicsWorld {
-    objects;
-    boundaries;
-    gravity;
-    objectCount;
-    constructor(boundaries, gravity = new Vector(0, 10.0)) {
-        this.objects = new Array();
-        this.boundaries = boundaries;
-        this.gravity = gravity;
-        this.objectCount = 0;
-    }
-    addObjectToWorld(obj) {
-        this.objects.push(obj);
-        this.objectCount++;
-    }
-    draw(ctx) {
-        // Draw object
-        this.objects.forEach((o) => {
-            o.draw(ctx);
-        });
-    }
-    update(delataTime) {
-        // update object
-        this.objects.forEach((o) => {
-            //apply gravity
-            if (o.isGravity) {
-                o.applyForce(this.gravity);
-            }
-            o.update(delataTime);
-        });
-        //
-        this.checkWallCollision();
-        // collition
-        for (let i = 0; i < this.objects.length; i++) {
-            const body1 = this.objects.at(i);
-            for (let j = 1; i < this.objects.length; i++) {
-                const body2 = this.objects.at(j);
-                if (body1 != undefined && body2 != undefined) {
-                    if (body1.shape == SHAPE.CIRCLE && body2.shape == SHAPE.CIRCLE) {
-                        if (this.checkCircleToCircle(body1, body2)) {
-                            let mass1 = body1.mass * -1;
-                            let mass2 = body2.mass * -1;
-                            // body1.velocity.mult(mass1)
-                            // body2.velocity.mult(mass2)
-                            console.log('hit');
-                        }
-                    }
-                }
-            }
-        }
-    }
-    checkWallCollision() {
-        for (let i = 0; i < this.objects.length; i++) {
-            const body = this.objects.at(i);
-            if (body != undefined) {
-                if (body.isStatic)
-                    continue;
-                if (body.shape == SHAPE.CIRCLE) {
-                    if (body.position.x > this.boundaries.w - body.radius ||
-                        body.position.x <= body.radius) {
-                        body.velocity.x *= -body.restitution;
-                    }
-                    //
-                    if (body.position.y > this.boundaries.h - body.radius ||
-                        body.position.y <= body.radius) {
-                        if (body.isGravity) {
-                            // Friction
-                            if (body.position.y + body.radius >= this.boundaries.h) {
-                                body.position.y = this.boundaries.h - body.radius;
-                                body.velocity.y = -body.velocity.y * body.restitution;
-                                body.velocity.x *= body.friction;
-                            }
-                        }
-                        else {
-                            body.velocity.y *= -body.restitution;
-                        }
-                    }
-                }
-                else if (body.shape == SHAPE.SQUARE) {
-                    if (body.position.x > this.boundaries.w - body.width ||
-                        body.position.x <= this.boundaries.x) {
-                        body.velocity.x *= -body.restitution;
-                    }
-                    //
-                    if (body.position.y > this.boundaries.h - body.height ||
-                        body.position.y <= this.boundaries.y) {
-                        body.velocity.y *= -body.restitution;
-                    }
-                }
-            }
-        }
-    }
-    checkCircleToRectCollision(circle, box) {
-        const closetX = Math.max(box.position.x, Math.min(circle.position.x, box.position.x + box.width));
-        const closetY = Math.max(box.position.y, Math.min(circle.position.y, box.position.y + box.height));
-        const distX = circle.position.x - closetX;
-        const distY = circle.position.y - closetY;
-        const distSqueared = distX * distX + distY * distY;
-        return distSqueared < circle.radius * circle.radius;
-    }
-    checkRectToRectCollision(box1, box2) {
-        return (box1.position.x < box2.position.x + box2.width &&
-            box1.position.x + box1.width > box2.position.x &&
-            box1.position.y < box2.position.y + box2.height &&
-            box1.position.y + box1.height > box2.position.y);
-    }
-    checkCircleToCircle(circle1, circle2) {
-        const dx = circle1.position.x - circle2.position.x;
-        const dy = circle1.position.y - circle2.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const radiiSum = circle1.radius + circle2.radius;
-        console.log(dist);
-        return dist <= radiiSum;
-    }
-}
-class Component {
-}
-class Position extends Component {
-    x;
-    y;
-    name = Position.name;
-    constructor(x, y) {
-        super();
-        this.x = x;
-        this.y = y;
-    }
-}
-class Size extends Component {
-    w;
-    h;
-    name = Size.name;
-    constructor(w, h) {
-        super();
-        this.w = w;
-        this.h = h;
-    }
-}
-class Sprite extends Component {
-    name = Sprite.name;
-    color;
+class Enemy {
+    body;
     lineWidth;
+    color;
     strokeStyle;
-    constructor(color = 'rgba(33, 204, 113, 1)', lineWidth = 3, strokeStyle = '#ffff') {
-        super();
-        this.color = color;
-        this.lineWidth = lineWidth;
-        this.strokeStyle = strokeStyle;
+    constructor(x, y) {
+        this.body = new Body();
+        this.body.position = new Vector(x, y);
+        this.color = this.getRandomColor();
+        this.lineWidth = 5;
+        this.strokeStyle = 'rgb(243, 243, 248)';
     }
-}
-class Shape extends Component {
-    name = Shape.name;
-    shape;
-    constructor(shape = SHAPE.SQUARE) {
-        super();
-        this.shape = shape;
+    getRandomColor() {
+        const color = {
+            r: Math.floor(Math.random() * 256),
+            g: Math.floor(Math.random() * 256),
+            b: Math.floor(Math.random() * 256)
+        };
+        return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`;
     }
-}
-class Dimension extends Component {
-    name = Dimension.name;
-    x;
-    y;
-    w;
-    h;
-    constructor(w, h, x = 0, y = 0) {
-        super();
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
-    }
-}
-class RectBody extends Component {
-    name = RectBody.name;
-    x;
-    y;
-    w;
-    h;
-    constructor(x, y, w = 64, h = 64) {
-        super();
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
-    }
-}
-class CircBody extends Component {
-    name = CircBody.name;
-    x;
-    y;
-    r;
-    constructor(x, y, r = 25) {
-        super();
-        this.x = x;
-        this.y = y;
-        this.r = r;
-    }
-}
-class Physics extends Component {
-    name = Physics.name;
-    isStatic;
-    position;
-    velocity;
-    accelaration;
-    mass;
-    restitution;
-    friction;
-    isGravity;
-    constructor(isStatic = false, position = new Vector(0, 0), velocity = new Vector(0, 0), accelaration = new Vector(0, 0), mass = 1, restitution = 1, friction = 0.98, isGravity = true) {
-        super();
-        this.isStatic = isStatic;
-        this.position = position;
-        this.velocity = velocity;
-        this.accelaration = accelaration;
-        this.mass = mass;
-        this.restitution = restitution;
-        this.friction = friction;
-        this.isGravity = isGravity;
-    }
-}
-class System {
-    ecs;
-    constructor(ecs) {
-        this.ecs = ecs;
-    }
-}
-class RenderSystem extends System {
-    name = RenderSystem.name;
-    componentsRequired = new Set([Position, Size, Sprite, Shape]);
-    constructor(ecs) {
-        super(ecs);
-    }
-    update(entities, deltaTime) { }
-    draw(entities, ctx) {
-        for (let entity of entities) {
-            let compos = this.ecs.getComponents(entity);
-            if (compos.hasAll(this.componentsRequired)) {
-                let pos = compos.get(Position.name);
-                let size = compos.get(Size.name);
-                let sprite = compos.get(Sprite.name);
-                let sh = compos.get(Shape.name);
-                if (sh.shape == SHAPE.CIRCLE) {
-                    let body = compos.get(CircBody.name);
-                    if (body) {
-                        if (ctx != null) {
-                            ctx.fillStyle = sprite.color;
-                            ctx.beginPath();
-                            ctx.arc(pos.x, pos.y, body.r, 0, 2 * Math.PI);
-                            ctx.fill();
-                            ctx.strokeStyle = sprite.strokeStyle;
-                            ctx.lineWidth = sprite.lineWidth;
-                            ctx.stroke();
-                        }
-                    }
-                }
-                else if (sh.shape == SHAPE.SQUARE) {
-                    let body = compos.get(RectBody.name);
-                    if (body) {
-                        if (ctx != null) {
-                            ctx.fillStyle = sprite.color;
-                            ctx.fillRect(pos.x, pos.y, size.w, size.h);
-                            ctx.strokeStyle = sprite.strokeStyle;
-                            ctx.lineWidth = sprite.lineWidth;
-                            ctx.strokeRect(pos.x, pos.y, size.w, size.h);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-class GravitySystem extends System {
-    name = RenderSystem.name;
-    componentsRequired = new Set([
-        Position,
-        Size,
-        Shape,
-        Physics,
-        Dimension
-    ]);
-    constructor(ecs) {
-        super(ecs);
-    }
-    update(entities, deltaTime) {
-        for (let entity of entities) {
-            let compos = this.ecs.getComponents(entity);
-            if (compos.hasAll(this.componentsRequired)) {
-                let pos = compos.get(Position.name);
-                let size = compos.get(Size.name);
-                let sh = compos.get(Shape.name);
-                if (sh.shape == SHAPE.CIRCLE) {
-                    let body = compos.get(CircBody.name);
-                    if (body) {
-                    }
-                }
-                else if (sh.shape == SHAPE.SQUARE) {
-                    let body = compos.get(RectBody.name);
-                    if (body) {
-                        let bPhysics = compos.get(Physics.name);
-                        if (bPhysics.isStatic)
-                            return;
-                        if (bPhysics.isGravity) {
-                            let dims = compos.get(Dimension.name);
-                            bPhysics.accelaration.mult(deltaTime);
-                            bPhysics.velocity.add(bPhysics.accelaration);
-                            bPhysics.position.add(bPhysics.velocity);
-                            //update position // Gravity
-                            pos.y += bPhysics.position.y;
-                            // Friction
-                            if (pos.y + size.h >= dims.h) {
-                                pos.y = dims.h - size.h;
-                                bPhysics.velocity.y = -bPhysics.velocity.y * bPhysics.restitution;
-                                bPhysics.velocity.x *= bPhysics.friction;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    draw(entities, ctx) { }
-}
-class ComponentContainer {
-    map = new Map();
-    add(component) {
-        this.map.set(component.name, component);
-    }
-    get(componetName) {
-        return this.map.get(componetName);
-    }
-    getAll() {
-        return this.map.values();
-    }
-    has(componet) {
-        return this.map.has(componet.name);
-    }
-    hasAll(components) {
-        for (let comp of components) {
-            if (!this.map.has(comp.name)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    delete(componetName) {
-        this.map.delete(componetName);
-    }
-}
-class ECS {
-    entities = new Map();
-    systems = new Map();
-    nextEntityID = 0;
-    entitiesToDestroy = new Array();
-    addEntity() {
-        let entity = this.nextEntityID;
-        this.nextEntityID++;
-        this.entities.set(entity, new ComponentContainer());
-        return entity;
-    }
-    removeEntity(entity) {
-        this.entitiesToDestroy.push(entity);
-    }
-    addComponent(entity, component) {
-        this.entities.get(entity)?.add(component);
-        this.checkE(entity);
-    }
-    getComponents(entity) {
-        return this.entities.get(entity);
-    }
-    removeComponent(entity, component) {
-        this.entities.get(entity)?.delete(component.name);
-        this.checkE(entity);
-    }
-    addSystem(system) {
-        if (system.componentsRequired.size == 0) {
-            console.warn('System no added: empty Component list');
-            console.warn(system);
+    update(delataTime) {
+        if (this.body.isStatic)
             return;
+        this.body.acceleration.mult(delataTime);
+        this.body.velocity.add(this.body.acceleration);
+        this.body.position.add(this.body.velocity);
+    }
+    draw(ctx) {
+        if (this.body.shape == SHAPE.CIRCLE) {
+            if (ctx != null) {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.body.position.x, this.body.position.y, this.body.radius, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = this.strokeStyle;
+                ctx.lineWidth = this.lineWidth;
+                ctx.stroke();
+            }
         }
-        this.systems.set(system, new Set());
-        for (let entity of this.entities.keys()) {
-            this.checkES(entity, system);
+        else if (this.body.shape == SHAPE.SQUARE) {
+            if (ctx != null) {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.body.position.x, this.body.position.y, this.body.size.w, this.body.size.h);
+                ctx.strokeStyle = this.strokeStyle;
+                ctx.lineWidth = this.lineWidth;
+                ctx.strokeRect(this.body.position.x, this.body.position.y, this.body.size.w, this.body.size.h);
+            }
         }
     }
-    removeSystem(system) {
-        this.systems.delete(system);
-    }
-    update(deltaTime) {
-        for (let [system, entities] of this.systems.entries()) {
-            system.update(entities, deltaTime);
+}
+class World {
+    width;
+    height;
+    player;
+    enemies;
+    constructor(w, h) {
+        this.width = w;
+        this.height = h;
+        //player
+        this.player = new Player(this.width / 2, 250);
+        // enemies
+        this.enemies = new Array();
+        for (let i = 0; i < 5; i++) {
+            let x = Math.random() * this.width;
+            let y = Math.random() * this.height;
+            const en = new Enemy(x, y);
+            en.body.applyForce(new Vector(5, 3));
+            this.enemies.push(en);
         }
-        while (this.entitiesToDestroy.length > 0) {
-            this.destroyEntity(this.entitiesToDestroy.pop());
+    }
+    update(delataTime) {
+        //update enemys
+        for (const e of this.enemies) {
+            e.update(delataTime);
+            //collision with the player
+            if (CollisionSystem.checkCircleCollision(this.player.body, e.body)) {
+                log('hit');
+            }
+            //collision wall
+            CollisionSystem.checkCircleCollisionBoundaries(e.body, {
+                w: this.width,
+                h: this.height,
+                y: 0,
+                x: 0
+            });
         }
     }
     draw(ctx) {
-        for (let [system, entities] of this.systems.entries()) {
-            system.draw(entities, ctx);
-        }
-    }
-    logEntity(entity) {
-        log(`Entity id: ${entity}`);
-        let comps = this.getComponents(entity);
-        for (const comp of comps.getAll()) {
-            log(`Entity id: ${entity} has a compontent ${comp.name}`);
-        }
-        for (const syst of this.systems.keys()) {
-            log(`ECS: has a system ${syst.name}`);
-        }
-    }
-    destroyEntity(entity) {
-        this.entities.delete(entity);
-        for (let entities of this.systems.values()) {
-            entities.delete(entity);
-        }
-    }
-    checkE(entity) {
-        for (let system of this.systems.keys()) {
-            this.checkES(entity, system);
-        }
-    }
-    checkES(entity, system) {
-        let have = this.entities.get(entity);
-        let need = system.componentsRequired;
-        if (have?.hasAll(need)) {
-            this.systems.get(system)?.add(entity);
-        }
-        else {
-            this.systems.get(system)?.delete(entity);
+        //player draw
+        this.player.draw(ctx);
+        //draw enemys
+        for (const e of this.enemies) {
+            e.draw(ctx);
         }
     }
 }
-//======================================================ECS=================================================================//
 //================================================MAIN====================================================================//
 class Game {
     canvas;
@@ -740,22 +426,10 @@ class Game {
         // Set display dimensions
         this.width = this.canvas.width = CANVAS_SIZE.w;
         this.height = this.canvas.height = CANVAS_SIZE.h;
+        this.world = new World(this.canvas.width, this.canvas.height);
         // 2. Game State Tracking
         this.isRunning = false;
         this.lastTime = 0;
-        this.world = new ECS();
-        this.world.addSystem(new RenderSystem(this.world));
-        this.world.addSystem(new GravitySystem(this.world));
-        let entity = this.world.addEntity();
-        this.world.addComponent(entity, new Position(250, 50));
-        this.world.addComponent(entity, new Size(32, 32));
-        this.world.addComponent(entity, new Sprite());
-        this.world.addComponent(entity, new Shape());
-        //this.world.addComponent(entity, new Shape(SHAPE.CIRCLE))
-        this.world.addComponent(entity, new RectBody(25, 25, 32, 32));
-        //this.world.addComponent(entity, new CircBody(250,250,30))
-        this.world.addComponent(entity, new Dimension(CANVAS_SIZE.w, CANVAS_SIZE.h));
-        //this.world.addComponent(entity, new Physics(false, new Vector(25, 25)))
         // 3. Input Handling
         this.keys = new Set();
         this.initInput();
@@ -804,13 +478,9 @@ class Game {
             // Draw background
             this.ctx.fillStyle = '#1a1a2e';
             this.ctx?.fillRect(0, 0, this.width, this.height);
-            // update object
-            //this.world.update(cappedDt)
-            // Draw object
-            //this.world.draw(this.ctx)
-            // update ECS
+            //update
             this.world.update(cappedDt);
-            // draw ECS
+            //draw world
             this.world.draw(this.ctx);
         }
         // Request next frame
