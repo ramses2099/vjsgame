@@ -6,11 +6,6 @@ const log = <T>(msg: T): void => {
   console.log(`[DEV] ${msg}`)
 }
 
-enum SHAPE {
-  CIRCLE,
-  SQUARE
-}
-
 interface RGBColor {
   r: number
   g: number
@@ -213,7 +208,6 @@ class Vector {
     return new Vector(x, y)
   }
   //
-
   /**
    * Vector to string
    *
@@ -225,278 +219,298 @@ class Vector {
   }
 }
 
-interface Drawable {
-  draw(ctx: CanvasRenderingContext2D | null): void
-}
+type Point = { x: number; y: number }
+type Dimension = { w: number; h: number }
+type Shape =
+  | { kind: 'circle'; radius: number; position: Point }
+  | { kind: 'square'; position: Point; dimension: Dimension }
+type StyleSprite = { color: string; lineWidth: number; strokeStyle: string }
 
-interface Updateble {
-  update(delataTime: number): void
-}
+//===============================================ECS=======================================================================//
+type Entity = number
 
-interface Size {
-  w: number
-  h: number
-}
+abstract class Component {}
 
-class Body {
+type ComponentClass<T extends Component> = new (...args: any[]) => T
+
+class Body extends Component {
+  kind: string
+  radius: number
   position: Vector
   velocity: Vector
   acceleration: Vector
-  size: Size
-  shape: SHAPE
-  radius: number
+  dimension: Dimension
   isStatic: boolean
 
-  constructor() {
-    this.position = new Vector()
-    this.size = { w: 32, h: 32 }
-    this.velocity = new Vector()
+  constructor(shape: Shape) {
+    super()
+    this.kind = shape.kind
+    this.radius = shape.kind == 'square' ? 0 : shape.radius
+    this.position = new Vector(shape.position.x, shape.position.y)
+    this.dimension = shape.kind == 'square' ? shape.dimension : { w: 0, h: 0 }
     this.acceleration = new Vector()
-    this.shape = SHAPE.CIRCLE
-    this.radius = 25
+    this.velocity = new Vector()
     this.isStatic = false
   }
+}
 
-  applyForce(force: Vector) {
-    this.acceleration.add(force)
+class Sprite extends Component {
+  color: string
+  lineWidth: number
+  strokeStyle: string
+
+  constructor(styleSprite: StyleSprite) {
+    super()
+    this.color = styleSprite.color
+    this.lineWidth = styleSprite.lineWidth
+    this.strokeStyle = styleSprite.strokeStyle
   }
 }
 
-class CollisionSystem {
-  static checkCircleCollision(a: Body, b: Body): boolean {
-    const ax = a.position.x + a.size.w / 2
-    const ay = a.position.y + a.size.h / 2
+abstract class System {
+  public abstract compoenentRequired: Set<Function>
 
-    const bx = b.position.x + b.size.w / 2
-    const by = b.position.y + b.size.h / 2
+  public abstract update(
+    entities: Set<Entity>,
+    delatatime: number,
+    ctx: CanvasRenderingContext2D | null
+  ): void
 
-    const dx = ax - bx
-    const dy = ay - by
-    const distSq = dx * dx + dy * dy
-    const radSum = a.radius + b.radius
+  public abstract ecs: ECS
+}
 
-    return distSq < radSum * radSum
+class RenderSystem extends System {
+  compoenentRequired = new Set<Function>([Body, Sprite])
+  ecs: ECS
+
+  constructor(ecs: ECS) {
+    super()
+    this.ecs = ecs
   }
-  //
-  static checkCircleCollisionBoundaries(
-    body: Body,
-    boundaries: Boundaries
+
+  update(
+    entities: Set<Entity>,
+    delatatime: number,
+    ctx: CanvasRenderingContext2D | null
   ): void {
-    if (body.isStatic) return
-    if (body.shape == SHAPE.CIRCLE) {
-      if (
-        body.position.x > boundaries.w - body.radius ||
-        body.position.x <= body.radius
-      ) {
-        body.velocity.x *= -1
-      }
-      //
-      if (
-        body.position.y > boundaries.h - body.radius ||
-        body.position.y <= body.radius
-      ) {
-        body.velocity.y *= -1
-      }
-    } else if (body.shape == SHAPE.SQUARE) {
-      if (
-        body.position.x > boundaries.w - body.size.w ||
-        body.position.x <= boundaries.x
-      ) {
-        body.velocity.x *= -1
-      }
-      //
-      if (
-        body.position.y > boundaries.h - body.size.h ||
-        body.position.y <= boundaries.y
-      ) {
-        body.velocity.y *= -1
-      }
-    }
-  }
-}
+    for (let entity of entities) {
+      let comp = this.ecs.getComponents(entity)
+      if (comp.hasAll(this.compoenentRequired)) {
+        let body = comp.get(Body)
+        let sprite = comp.get(Sprite)
 
-class Player implements Drawable, Updateble {
-  body: Body
-  lineWidth: number
-  color: string
-  strokeStyle: string
-
-  constructor(x: number, y: number) {
-    this.body = new Body()
-    this.body.position = new Vector(x, y)
-    this.color = 'rgb(50, 66, 241)'
-    this.lineWidth = 5
-    this.strokeStyle = 'rgb(243, 243, 248)'
-  }
-  update(delataTime: number): void {
-    if (this.body.isStatic) return
-
-    this.body.acceleration.mult(delataTime)
-    this.body.velocity.add(this.body.acceleration)
-    this.body.position.add(this.body.velocity)
-  }
-  draw(ctx: CanvasRenderingContext2D | null): void {
-    if (this.body.shape == SHAPE.CIRCLE) {
-      if (ctx != null) {
-        ctx.fillStyle = this.color
-        ctx.beginPath()
-        ctx.arc(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.radius,
-          0,
-          2 * Math.PI
-        )
-        ctx.fill()
-        ctx.strokeStyle = this.strokeStyle
-        ctx.lineWidth = this.lineWidth
-        ctx.stroke()
-      }
-    } else if (this.body.shape == SHAPE.SQUARE) {
-      if (ctx != null) {
-        ctx.fillStyle = this.color
-        ctx.fillRect(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.size.w,
-          this.body.size.h
-        )
-        ctx.strokeStyle = this.strokeStyle
-        ctx.lineWidth = this.lineWidth
-        ctx.strokeRect(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.size.w,
-          this.body.size.h
-        )
+        if (body.kind == 'circle') {
+          if (ctx != null) {
+            ctx.fillStyle = sprite.color
+            ctx.beginPath()
+            ctx.arc(
+              body.position.x,
+              body.position.y,
+              body.radius,
+              0,
+              2 * Math.PI
+            )
+            ctx.fill()
+            ctx.strokeStyle = sprite.strokeStyle
+            ctx.lineWidth = sprite.lineWidth
+            ctx.stroke()
+          }
+        } else if (body.kind == 'square') {
+          if (ctx != null) {
+            ctx.fillStyle = sprite.color
+            ctx.fillRect(
+              body.position.x,
+              body.position.y,
+              body.dimension.w,
+              body.dimension.h
+            )
+            ctx.strokeStyle = sprite.strokeStyle
+            ctx.lineWidth = sprite.lineWidth
+            ctx.strokeRect(
+              body.position.x,
+              body.position.y,
+              body.dimension.w,
+              body.dimension.h
+            )
+          }
+        }
       }
     }
   }
 }
 
-class Enemy implements Drawable, Updateble {
-  body: Body
-  lineWidth: number
-  color: string
-  strokeStyle: string
+class GravitySystem extends System {
+  compoenentRequired = new Set<Function>([Body, Sprite])
+  ecs: ECS
 
-  constructor(x: number, y: number) {
-    this.body = new Body()
-    this.body.position = new Vector(x, y)
-    this.color = this.getRandomColor()
-    this.lineWidth = 5
-    this.strokeStyle = 'rgb(243, 243, 248)'
+  constructor(ecs: ECS) {
+    super()
+    this.ecs = ecs
   }
 
-  getRandomColor(): string {
-    const color: RGBColor = {
-      r: Math.floor(Math.random() * 256),
-      g: Math.floor(Math.random() * 256),
-      b: Math.floor(Math.random() * 256)
-    }
+  update(
+    entities: Set<Entity>,
+    delatatime: number,
+    ctx: CanvasRenderingContext2D | null
+  ): void {
+    for (let entity of entities) {
+      let comp = this.ecs.getComponents(entity)
+      if (comp.hasAll(this.compoenentRequired)) {
+        let body = comp.get(Body)
+        if (body.isStatic) return
 
-    return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`
-  }
-
-  update(delataTime: number): void {
-    if (this.body.isStatic) return
-
-    this.body.acceleration.mult(delataTime)
-    this.body.velocity.add(this.body.acceleration)
-    this.body.position.add(this.body.velocity)
-  }
-
-  draw(ctx: CanvasRenderingContext2D | null): void {
-    if (this.body.shape == SHAPE.CIRCLE) {
-      if (ctx != null) {
-        ctx.fillStyle = this.color
-        ctx.beginPath()
-        ctx.arc(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.radius,
-          0,
-          2 * Math.PI
-        )
-        ctx.fill()
-        ctx.strokeStyle = this.strokeStyle
-        ctx.lineWidth = this.lineWidth
-        ctx.stroke()
-      }
-    } else if (this.body.shape == SHAPE.SQUARE) {
-      if (ctx != null) {
-        ctx.fillStyle = this.color
-        ctx.fillRect(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.size.w,
-          this.body.size.h
-        )
-        ctx.strokeStyle = this.strokeStyle
-        ctx.lineWidth = this.lineWidth
-        ctx.strokeRect(
-          this.body.position.x,
-          this.body.position.y,
-          this.body.size.w,
-          this.body.size.h
-        )
+        body.acceleration.mult(delatatime)
+        body.velocity.add(body.acceleration)
+        body.position.add(body.velocity)
       }
     }
   }
 }
 
-class World {
-  width: number
-  height: number
+class ComponentContainer {
+  private map = new Map<Function, Component>()
 
-  player: Player
-  enemies: Array<Enemy>
+  public add(component: Component): void {
+    this.map.set(component.constructor, component)
+  }
 
-  constructor(w: number, h: number) {
-    this.width = w
-    this.height = h
+  public get<T extends Component>(componentClass: ComponentClass<T>): T {
+    return this.map.get(componentClass) as T
+  }
 
-    //player
-    this.player = new Player(this.width / 2, 250)
-    // enemies
-    this.enemies = new Array<Enemy>()
+  public has(componentClass: Function): boolean {
+    return this.has(componentClass)
+  }
 
-    for (let i = 0; i < 5; i++) {
-      let x = Math.random() * this.width
-      let y = Math.random() * this.height
-      const en = new Enemy(x, y)
-      en.body.applyForce(new Vector(5, 3))
-      this.enemies.push(en)
+  public hasAll(componentClasses: Iterable<Function>): boolean {
+    for (let cls of componentClasses) {
+      if (!this.map.has(cls)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  public delete(componentClass: Function): void {
+    this.map.delete(componentClass)
+  }
+}
+
+class ECS {
+  private entities = new Map<Entity, ComponentContainer>()
+  private systems = new Map<System, Set<Entity>>()
+
+  private nextEntityID = 0
+  private entitiesToDestroy = new Array<Entity>()
+
+  public addEntity(): Entity {
+    let entity = this.nextEntityID
+    this.nextEntityID++
+    this.entities.set(entity, new ComponentContainer())
+    return entity
+  }
+
+  public removeEntity(entity: Entity): void {
+    this.entitiesToDestroy.push(entity)
+  }
+
+  public addComponent(entity: Entity, component: Component): void {
+    this.entities.get(entity)?.add(component)
+    this.checkE(entity)
+  }
+
+  public getComponents(entity: Entity): ComponentContainer {
+    return this.entities.get(entity) as ComponentContainer
+  }
+
+  public removeComponent(entity: Entity, componentClass: Function): void {
+    this.entities.get(entity)?.delete(componentClass)
+    this.checkE(entity)
+  }
+
+  public addSystem(system: System): void {
+    if (system.compoenentRequired.size == 0) {
+      console.warn('System not added: empty Component lsit.')
+      console.warn(system)
+      return
+    }
+
+    system.ecs = this
+
+    this.systems.set(system, new Set())
+    for (let entity of this.entities.keys()) {
+      this.checkES(entity, system)
     }
   }
 
-  update(delataTime: number): void {
-    //update enemys
-    for (const e of this.enemies) {
-      e.update(delataTime)
+  public removeSystem(system: System): void {
+    this.systems.delete(system)
+  }
 
-      //collision with the player
-      if (CollisionSystem.checkCircleCollision(this.player.body, e.body)) {
-        log<string>('hit')
-      }
+  public update(deltatime: number, ctx: CanvasRenderingContext2D | null): void {
+    for (let [system, entities] of this.systems.entries()) {
+      system.update(entities, deltatime, ctx)
+    }
 
-      //collision wall
-      CollisionSystem.checkCircleCollisionBoundaries(e.body, {
-        w: this.width,
-        h: this.height,
-        y: 0,
-        x: 0
+    while (this.entitiesToDestroy.length > 0) {
+      this.destroyEntity(this.entitiesToDestroy.pop() as number)
+    }
+  }
+
+  private destroyEntity(entity: Entity): void {
+    this.entities.delete(entity)
+    for (let entities of this.systems.values()) {
+      entities.delete(entity)
+    }
+  }
+
+  private checkE(entity: Entity): void {
+    for (let system of this.systems.keys()) {
+      this.checkES(entity, system)
+    }
+  }
+
+  private checkES(entity: Entity, system: System): void {
+    let have = this.entities.get(entity)
+    let need = system.compoenentRequired
+    if (have?.hasAll(need)) {
+      this.systems.get(system)?.add(entity)
+    } else {
+      this.systems.get(system)?.delete(entity)
+    }
+  }
+}
+
+class EntityFactory {
+  static create(world: ECS, shape: Shape, sts: StyleSprite): void {
+    let entity = world.addEntity()
+    if (shape.kind == 'circle') {
+      world.addComponent(
+        entity,
+        new Body({
+          kind: shape.kind,
+          radius: shape.radius,
+          position: shape.position
+        })
+      )
+    } else if (shape.kind == 'square') {
+      world.addComponent(
+        entity,
+        new Body({
+          kind: shape.kind,
+          position: shape.position,
+          dimension: shape.dimension
+        })
+      )
+    }
+    world.addComponent(
+      entity,
+      new Sprite({
+        color: sts.color,
+        lineWidth: sts.lineWidth,
+        strokeStyle: sts.strokeStyle
       })
-    }
-  }
-
-  draw(ctx: CanvasRenderingContext2D | null): void {
-    //player draw
-    this.player.draw(ctx)
-    //draw enemys
-    for (const e of this.enemies) {
-      e.draw(ctx)
-    }
+    )
   }
 }
 
@@ -509,8 +523,7 @@ class Game {
   width: number
   height: number
 
-  //world: PhysicsWorld
-  world: World
+  world: ECS
 
   // 2. Game State Tracking
   isRunning: boolean
@@ -527,7 +540,66 @@ class Game {
     this.width = this.canvas.width = CANVAS_SIZE.w
     this.height = this.canvas.height = CANVAS_SIZE.h
 
-    this.world = new World(this.canvas.width, this.canvas.height)
+    //ECS
+    this.world = new ECS()
+
+    let entity = this.world.addEntity()
+    this.world.addComponent(
+      entity,
+      new Body({ kind: 'circle', radius: 25, position: { x: 250, y: 50 } })
+    )
+    this.world.addComponent(
+      entity,
+      new Sprite({
+        color: 'rgba(33, 204, 113, 1)',
+        lineWidth: 3,
+        strokeStyle: '#ffff'
+      })
+    )
+
+    let entity2 = this.world.addEntity()
+    this.world.addComponent(
+      entity2,
+      new Body({
+        kind: 'square',
+        position: { x: 450, y: 50 },
+        dimension: { w: 32, h: 32 }
+      })
+    )
+    this.world.addComponent(
+      entity2,
+      new Sprite({
+        color: 'rgb(17, 33, 204)',
+        lineWidth: 3,
+        strokeStyle: '#ffff'
+      })
+    )
+
+    for (let i = 0; i < 10; i++) {
+      let sh: Shape
+      if (i % 2 == 0) {
+        sh = {
+          kind: 'circle',
+          radius: this.getRandomInt(25),
+          position: { x: this.getRandomInt(350), y: this.getRandomInt(450) }
+        }
+      } else {
+        sh = {
+          kind: 'square',
+          position: { x: this.getRandomInt(350), y: this.getRandomInt(450) },
+          dimension: { w: 32, h: 32 }
+        }
+      }
+      let ss = {
+        color: this.getRandomColor(),
+        lineWidth: 3,
+        strokeStyle: 'fff'
+      }
+
+      EntityFactory.create(this.world, sh, ss)
+    }
+
+    this.world.addSystem(new RenderSystem(this.world))
 
     // 2. Game State Tracking
     this.isRunning = false
@@ -592,10 +664,10 @@ class Game {
       this.ctx?.fillRect(0, 0, this.width, this.height)
 
       //update
-      this.world.update(cappedDt)
+      this.world.update(cappedDt, this.ctx)
 
       //draw world
-      this.world.draw(this.ctx)
+      //this.world.draw(this.ctx)
     }
 
     // Request next frame
