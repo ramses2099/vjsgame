@@ -309,6 +309,31 @@ class Helper {
   //
 }
 
+class Matrix {
+  rows: number
+  cols: number
+  data: number[][] = []
+
+  constructor(rows: number, cols: number) {
+    this.rows = rows
+    this.cols = cols
+    //
+    for (let i = 0; i < this.rows; i++) {
+      this.data[i] = []
+      for (let j = 0; j < this.cols; j++) {
+        this.data[i]![j] = 0
+      }
+    }
+  }
+  //
+  multiplyVec(vec: Vect2d): Vect2d {
+    let result = new Vect2d(0, 0)
+    result.x = this.data[0]![0]! * vec.x + this.data[0]![1]! * vec.y
+    result.y = this.data[1]![0]! * vec.x + this.data[1]![1]! * vec.y
+    return result
+  }
+}
+
 //=========================================================
 
 const objectArray: Array<IObject> = new Array<IObject>()
