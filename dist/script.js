@@ -1,554 +1,360 @@
-//=======================================================================================================================//
-const CANVAS_SIZE = { w: 800, h: 600 };
-const DEBUG = true;
+const canvas = document.getElementById('canvas1');
+const ctx = canvas.getContext('2d');
+const CANVAS_SIZE = { w: 640, h: 480 };
 const log = (msg) => {
-    console.log(`[DEV] ${msg}`);
+    console.log(`[DEBUG] - ${msg}`);
 };
-class Vector {
+//=====================VARIABLE CONST======================
+let lastTime = 0;
+let LEFT = false;
+let RIGHT = false;
+let UP = false;
+let DOWN = false;
+let MSG = '';
+//=========================================================
+class IObject {
+    pos;
+    vec;
+    acc;
+    r;
+    speed;
+    friction;
+    elasticity;
+    mass;
+    inv_mass;
+    constructor(pos, vec, acc, r = 25, mass = 0, speed = 1) {
+        this.pos = pos;
+        this.vec = vec;
+        this.acc = acc;
+        this.r = r;
+        this.mass = mass;
+        if (this.mass == 0) {
+            this.inv_mass = 0;
+        }
+        else {
+            this.inv_mass = 1 / this.mass;
+        }
+        this.speed = speed;
+        this.friction = 0.05;
+        this.elasticity = 1;
+    }
+}
+class Vect2d {
     x;
     y;
     constructor(x = 0, y = 0) {
         this.x = x;
         this.y = y;
     }
-    /**
-     * Adds a vector to this vector
-     *
-     * @param v - The Vector.
-     *
-     */
     add(v) {
-        this.x = this.x + v.x;
-        this.y = this.y + v.y;
+        return new Vect2d(this.x + v.x, this.y + v.y);
     }
-    //
-    /**
-     * Subtracts a vector from this vector
-     *
-     * @param v - The Vector.
-     *
-     */
     sub(v) {
-        this.x = this.x + v.x;
-        this.y = this.y + v.y;
+        return new Vect2d(this.x - v.x, this.y - v.y);
     }
-    //
-    /**
-     * Scales this vector with multiplication
-     *
-     * @param n - The number.
-     *
-     */
     mult(n) {
-        this.x = this.x * n;
-        this.y = this.y * n;
+        return new Vect2d(this.x * n, this.y * n);
     }
-    //
-    /**
-     * Scales this vector with division
-     *
-     * @param n - The number.
-     *
-     */
-    div(n) {
-        this.x = this.x / n;
-        this.y = this.y / n;
-    }
-    //
-    /**
-     * Returns the magnitude of this vector
-     *
-     * @param n - The number.
-     * @returns number
-     *
-     */
     mag() {
-        return Math.sqrt(Math.pow(this.x, 2) + Math.pow(this.y, 2));
+        return Math.sqrt(this.x ** 2 + this.y ** 2);
     }
-    //
-    /**
-     * Returns the magnitude of this vector
-     *
-     * @param n - The number.
-     * @returns number
-     *
-     */
-    lenghtSq() {
-        return Math.pow(this.x, 2) + Math.pow(this.y, 2);
-    }
-    //
-    /**
-     * Normalizes this vector to a unit length of 1
-     *
-     */
-    normalize() {
-        let m = this.mag();
-        if (m > 0) {
-            this.div(m);
+    unit() {
+        if (this.mag() === 0) {
+            return new Vect2d();
+        }
+        else {
+            return new Vect2d(this.x / this.mag(), this.y / this.mag());
         }
     }
-    //
-    /**
-     * Limits the magnitude of this vector
-     *
-     * @param max - The number.
-     *
-     * @returns number
-     */
-    limit(max) {
-        const length = this.mag();
-        if (length > max && length > 0) {
-            this.x = (this.x / length) * max;
-            this.y = (this.y / length) * max;
-        }
+    normal() {
+        return new Vect2d(-this.y, this.x).unit();
     }
-    //
-    /**
-     * Returns the Euclidean distance between two vectors (considered as points)
-     *
-     * @param v - The Vector.
-     *
-     */
-    dist(v) {
-        return Math.hypot(v.x - this.x, v.y - this.y);
+    show() {
+        return `{x:${this.x},y:${this.y}}`;
     }
-    //
-    /**
-     * Returns the dot product of two vectors
-     *
-     * @param v - The Vector.
-     * @returns number
-     */
-    dot(v) {
-        return this.x * v.x + this.y * v.y;
-    }
-    //
-    /**
-     * Returns the copy of the vector
-     *
-     * @return v - The Vector.
-     *
-     */
-    copy() {
-        return new Vector(this.x, this.y);
-    }
-    //
-    /**
-     * Returns a random 2D vector
-     *
-     * @return v - The Vector.
-     *
-     */
-    random2D() {
-        const angle = Math.random() * Math.PI * 2;
-        return new Vector(Math.cos(angle), Math.sin(angle));
-    }
-    //
-    /**
-     * Static Subtracts a vector from this vector
-     *
-     * @param v - The Vector.
-     *
-     */
-    static sub(v1, v2) {
-        return new Vector(v1.x - v2.x, v1.y - v2.y);
-    }
-    //
-    /**
-     * Static Subtracts a vector from this vector
-     *
-     * @param v - The Vector.
-     *
-     */
-    static add(v1, v2) {
-        return new Vector(v1.x + v2.x, v1.y + v2.y);
-    }
-    //
-    /**
-     * Static Subtracts a vector from this vector
-     *
-     * @param v - The Vector.
-     *
-     */
     static dot(v1, v2) {
         return v1.x * v2.x + v1.y * v2.y;
     }
+}
+class Player extends IObject {
+    r;
+    constructor(pos, r, mass) {
+        super(pos, new Vect2d(0, 0), new Vect2d(0, 0), r, mass);
+        this.r = r;
+    }
+    update(dt) {
+        if (LEFT) {
+            this.acc.x -= this.speed;
+        }
+        if (RIGHT) {
+            this.acc.x += this.speed;
+        }
+        if (UP) {
+            this.acc.y -= this.speed;
+        }
+        if (DOWN) {
+            this.acc.y += this.speed;
+        }
+        if (!DOWN && !UP) {
+            this.acc.y = 0;
+        }
+        //
+        if (!RIGHT && !LEFT) {
+            this.acc.x = 0;
+        }
+        this.vec = this.vec.add(this.acc);
+        this.vec = this.vec.mult(1 - this.friction);
+        this.pos.x += this.vec.x * dt;
+        this.pos.y += this.vec.y * dt;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#2d889c';
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+    displayDirection(ctx) {
+        ctx.beginPath();
+        ctx.moveTo(this.pos.x, this.pos.y);
+        ctx.lineTo(this.pos.x + this.acc.x * 2, this.pos.y + this.acc.y * 2);
+        ctx.strokeStyle = '#0508a8';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.pos.x, this.pos.y);
+        ctx.lineTo(this.pos.x + this.vec.x * 2, this.pos.y + this.vec.y * 2);
+        ctx.strokeStyle = '#eb1e24';
+        ctx.stroke();
+    }
+}
+class Ball extends IObject {
+    constructor(pos, r, mass) {
+        super(pos, new Vect2d(0, 0), new Vect2d(0, 0), r, mass);
+    }
+    update(dt) {
+        this.acc = this.acc.unit().mult(this.speed);
+        this.vec = this.vec.add(this.acc);
+        this.vec = this.vec.mult(1 - this.friction);
+        this.pos = this.pos.add(this.vec);
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#ec2f0e';
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+}
+class Wall {
+    start;
+    end;
+    constructor(x1, y1, x2, y2, wall) {
+        this.start = new Vect2d(x1, y1);
+        this.end = new Vect2d(x2, y2);
+        wall.push(this);
+    }
     //
-    static mult(v1, n) {
-        return new Vector(v1.x * n, v1.y * n);
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.moveTo(this.start.x, this.start.y);
+        ctx.lineTo(this.end.x, this.end.y);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
     }
     //
-    /**
-     * Returns a random 2D vector
-     *
-     * @return v - The Vector.
-     *
-     */
-    static random2D(min, max) {
-        let minCeiled = Math.ceil(min);
-        let maxFloored = Math.floor(max);
-        let x = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled);
-        let y = Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled);
-        return new Vector(x, y);
+    wallUnit() {
+        return this.end.sub(this.start).unit();
+    }
+}
+class CollisionDetect {
+    static distanceVector(pos1, pos2) {
+        return pos1.sub(pos2).mag();
+    }
+    static collision_det_bb(b1, b2) {
+        let dist = b2.pos.sub(b1.pos).mag();
+        let rsum = b2.r + b2.r;
+        if (rsum >= dist) {
+            return true;
+        }
+        return false;
     }
     //
-    /**
-     * Vector to string
-     *
-     * @return v - The Vector to strig representation.
-     *
-     */
-    toString() {
-        return `{x: ${this.x}, y: ${this.y}}`;
+    static pen_res_bb(b1, b2) {
+        let dist = b1.pos.sub(b2.pos);
+        let pen_depth = b1.r + b2.r - dist.mag();
+        let pen_res = dist.unit().mult(pen_depth / (b1.inv_mass + b2.inv_mass));
+        b1.pos = b1.pos.add(pen_res.mult(b1.inv_mass));
+        b2.pos = b2.pos.add(pen_res.mult(-b2.inv_mass));
+    }
+    //
+    static coll_res_bb(b1, b2) {
+        let normal = b1.pos.sub(b2.pos).unit();
+        let relVel = b1.vec.sub(b2.vec);
+        let sepVel = Vect2d.dot(relVel, normal);
+        let new_sepVel = -sepVel * Math.min(b1.elasticity, b2.elasticity);
+        let vsep_diff = new_sepVel - sepVel;
+        let impulse = vsep_diff / (b1.inv_mass + b2.inv_mass);
+        let impulseVec = normal.mult(impulse);
+        b1.vec = b1.vec.add(impulseVec.mult(b1.inv_mass));
+        b2.vec = b2.vec.add(impulseVec.mult(-b2.inv_mass));
+    }
+    //
+    static clossestPointBW(b1, w1) {
+        let ballToWallStart = w1.start.sub(b1.pos);
+        if (Vect2d.dot(w1.wallUnit(), ballToWallStart) > 0) {
+            return w1.start;
+        }
+        let wallEndToBall = b1.pos.sub(w1.end);
+        if (Vect2d.dot(w1.wallUnit(), wallEndToBall) > 0) {
+            return w1.end;
+        }
+        let closestDist = Vect2d.dot(w1.wallUnit(), ballToWallStart);
+        let closestVect = w1.wallUnit().mult(closestDist);
+        return w1.start.sub(closestVect);
+    }
+    //
+    static coll_det_bw(b1, w1) {
+        let ballToClosest = CollisionDetect.clossestPointBW(b1, w1).sub(b1.pos);
+        if (ballToClosest.mag() <= b1.r) {
+            return true;
+        }
+        return false;
+    }
+    //
+    static pen_res_bw(b1, w1) {
+        let penVect = b1.pos.sub(CollisionDetect.clossestPointBW(b1, w1));
+        b1.pos = b1.pos.add(penVect.unit().mult(b1.r - penVect.mag()));
+    }
+    //
+    static coll_res_bw(b1, w1) {
+        let normal = b1.pos.sub(CollisionDetect.clossestPointBW(b1, w1)).unit();
+        let sepVel = Vect2d.dot(b1.vec, normal);
+        let new_sepVel = -sepVel * b1.elasticity;
+        let vsep_diff = sepVel - new_sepVel;
+        b1.vec = b1.vec.add(normal.mult(-vsep_diff));
     }
 }
-class Component {
-}
-class Body extends Component {
-    kind;
-    radius;
-    position;
-    velocity;
-    acceleration;
-    dimension;
-    isStatic;
-    constructor(shape) {
-        super();
-        this.kind = shape.kind;
-        this.radius = shape.kind == 'square' ? 0 : shape.radius;
-        this.position = new Vector(shape.position.x, shape.position.y);
-        this.dimension = shape.kind == 'square' ? shape.dimension : { w: 0, h: 0 };
-        this.acceleration = new Vector();
-        this.velocity = new Vector();
-        this.isStatic = false;
+class Helper {
+    static randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    //
+    static round(num, precision) {
+        let fact = 10 ** precision;
+        return Math.round(num * fact) / fact;
     }
 }
-class Sprite extends Component {
-    color;
-    lineWidth;
-    strokeStyle;
-    constructor(styleSprite) {
-        super();
-        this.color = styleSprite.color;
-        this.lineWidth = styleSprite.lineWidth;
-        this.strokeStyle = styleSprite.strokeStyle;
-    }
+//=========================================================
+const objectArray = new Array();
+const player = new Player(new Vect2d(250, 50), 15, 2);
+const WALL = new Array();
+const wall1 = new Wall(200, 200, 400, 300, WALL);
+const edge1 = new Wall(0, 0, CANVAS_SIZE.w, 0, WALL);
+const edge2 = new Wall(CANVAS_SIZE.w, 0, CANVAS_SIZE.w, CANVAS_SIZE.h, WALL);
+const edge3 = new Wall(CANVAS_SIZE.w, CANVAS_SIZE.h, 0, CANVAS_SIZE.h, WALL);
+const edge4 = new Wall(0, CANVAS_SIZE.h, 0, 0, WALL);
+/*--
+for (let i = 0; i < 10; i++) {
+  let x = Helper.randInt(100, 500)
+  let y = Helper.randInt(50, 400)
+  let r = Helper.randInt(10, 30)
+  let m = Helper.randInt(0, 10)
+  const other = new Ball(new Vect2d(x, y), r, m)
+  objectArray.push(other)
 }
-class System {
-}
-class RenderSystem extends System {
-    compoenentRequired = new Set([Body, Sprite]);
-    ecs;
-    constructor(ecs) {
-        super();
-        this.ecs = ecs;
+--*/
+//======================Input Event========================
+window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') {
+        LEFT = true;
     }
-    update(entities, delatatime, ctx) {
-        for (let entity of entities) {
-            let comp = this.ecs.getComponents(entity);
-            if (comp.hasAll(this.compoenentRequired)) {
-                let body = comp.get(Body);
-                let sprite = comp.get(Sprite);
-                if (body.kind == 'circle') {
-                    if (ctx != null) {
-                        ctx.fillStyle = sprite.color;
-                        ctx.beginPath();
-                        ctx.arc(body.position.x, body.position.y, body.radius, 0, 2 * Math.PI);
-                        ctx.fill();
-                        ctx.strokeStyle = sprite.strokeStyle;
-                        ctx.lineWidth = sprite.lineWidth;
-                        ctx.stroke();
-                    }
-                }
-                else if (body.kind == 'square') {
-                    if (ctx != null) {
-                        ctx.fillStyle = sprite.color;
-                        ctx.fillRect(body.position.x, body.position.y, body.dimension.w, body.dimension.h);
-                        ctx.strokeStyle = sprite.strokeStyle;
-                        ctx.lineWidth = sprite.lineWidth;
-                        ctx.strokeRect(body.position.x, body.position.y, body.dimension.w, body.dimension.h);
-                    }
-                }
-            }
+    else if (e.key === 'ArrowRight') {
+        RIGHT = true;
+    }
+    else if (e.key === 'ArrowUp') {
+        UP = true;
+    }
+    else if (e.key === 'ArrowDown') {
+        DOWN = true;
+    }
+});
+window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft') {
+        LEFT = false;
+    }
+    else if (e.key === 'ArrowRight') {
+        RIGHT = false;
+    }
+    else if (e.key === 'ArrowUp') {
+        UP = false;
+    }
+    else if (e.key === 'ArrowDown') {
+        DOWN = false;
+    }
+});
+//======================Input Event========================
+const drawObject = () => {
+    //clear canvas
+    ctx.clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h);
+    // draw object
+    for (const o of objectArray) {
+        o.draw(ctx);
+        let dv = CollisionDetect.distanceVector(o.pos, player.pos);
+        let text = `Distances vec ${dv.toFixed(2)}`;
+        //drawText(text, new Vect2d(510, 50))
+    }
+    //
+    WALL.forEach(w => {
+        w.draw(ctx);
+    });
+    //direction player
+    player.draw(ctx);
+    player.displayDirection(ctx);
+};
+const updateObject = (deltatime) => {
+    for (const o of objectArray) {
+        //collision
+        if (CollisionDetect.collision_det_bb(o, player)) {
+            CollisionDetect.pen_res_bb(o, player);
+            CollisionDetect.coll_res_bb(o, player);
         }
+        o.update(deltatime);
     }
-}
-class GravitySystem extends System {
-    compoenentRequired = new Set([Body, Sprite]);
-    ecs;
-    constructor(ecs) {
-        super();
-        this.ecs = ecs;
-    }
-    update(entities, delatatime, ctx) {
-        for (let entity of entities) {
-            let comp = this.ecs.getComponents(entity);
-            if (comp.hasAll(this.compoenentRequired)) {
-                let body = comp.get(Body);
-                if (body.isStatic)
-                    return;
-                body.acceleration.mult(delatatime);
-                body.velocity.add(body.acceleration);
-                body.position.add(body.velocity);
-            }
+    player.update(deltatime);
+    //Collition with walls
+    WALL.forEach(w => {
+        if (CollisionDetect.coll_det_bw(player, w)) {
+            CollisionDetect.pen_res_bw(player, w);
+            CollisionDetect.coll_res_bw(player, w);
         }
-    }
-}
-class ComponentContainer {
-    map = new Map();
-    add(component) {
-        this.map.set(component.constructor, component);
-    }
-    get(componentClass) {
-        return this.map.get(componentClass);
-    }
-    has(componentClass) {
-        return this.has(componentClass);
-    }
-    hasAll(componentClasses) {
-        for (let cls of componentClasses) {
-            if (!this.map.has(cls)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    delete(componentClass) {
-        this.map.delete(componentClass);
-    }
-}
-class ECS {
-    entities = new Map();
-    systems = new Map();
-    nextEntityID = 0;
-    entitiesToDestroy = new Array();
-    addEntity() {
-        let entity = this.nextEntityID;
-        this.nextEntityID++;
-        this.entities.set(entity, new ComponentContainer());
-        return entity;
-    }
-    removeEntity(entity) {
-        this.entitiesToDestroy.push(entity);
-    }
-    addComponent(entity, component) {
-        this.entities.get(entity)?.add(component);
-        this.checkE(entity);
-    }
-    getComponents(entity) {
-        return this.entities.get(entity);
-    }
-    removeComponent(entity, componentClass) {
-        this.entities.get(entity)?.delete(componentClass);
-        this.checkE(entity);
-    }
-    addSystem(system) {
-        if (system.compoenentRequired.size == 0) {
-            console.warn('System not added: empty Component lsit.');
-            console.warn(system);
-            return;
-        }
-        system.ecs = this;
-        this.systems.set(system, new Set());
-        for (let entity of this.entities.keys()) {
-            this.checkES(entity, system);
-        }
-    }
-    removeSystem(system) {
-        this.systems.delete(system);
-    }
-    update(deltatime, ctx) {
-        for (let [system, entities] of this.systems.entries()) {
-            system.update(entities, deltatime, ctx);
-        }
-        while (this.entitiesToDestroy.length > 0) {
-            this.destroyEntity(this.entitiesToDestroy.pop());
-        }
-    }
-    destroyEntity(entity) {
-        this.entities.delete(entity);
-        for (let entities of this.systems.values()) {
-            entities.delete(entity);
-        }
-    }
-    checkE(entity) {
-        for (let system of this.systems.keys()) {
-            this.checkES(entity, system);
-        }
-    }
-    checkES(entity, system) {
-        let have = this.entities.get(entity);
-        let need = system.compoenentRequired;
-        if (have?.hasAll(need)) {
-            this.systems.get(system)?.add(entity);
-        }
-        else {
-            this.systems.get(system)?.delete(entity);
-        }
-    }
-}
-class EntityFactory {
-    static create(world, shape, sts) {
-        let entity = world.addEntity();
-        if (shape.kind == 'circle') {
-            world.addComponent(entity, new Body({
-                kind: shape.kind,
-                radius: shape.radius,
-                position: shape.position
-            }));
-        }
-        else if (shape.kind == 'square') {
-            world.addComponent(entity, new Body({
-                kind: shape.kind,
-                position: shape.position,
-                dimension: shape.dimension
-            }));
-        }
-        world.addComponent(entity, new Sprite({
-            color: sts.color,
-            lineWidth: sts.lineWidth,
-            strokeStyle: sts.strokeStyle
-        }));
-    }
-}
-//================================================MAIN====================================================================//
-class Game {
-    canvas;
-    ctx;
-    // Set display dimensions
-    width;
-    height;
-    world;
-    // 2. Game State Tracking
-    isRunning;
-    lastTime;
-    keys;
-    constructor(canvasId) {
-        // 1. Initialize Canvas and Context
-        this.canvas = document.getElementById(canvasId);
-        this.ctx = this.canvas.getContext('2d');
-        // Set display dimensions
-        this.width = this.canvas.width = CANVAS_SIZE.w;
-        this.height = this.canvas.height = CANVAS_SIZE.h;
-        //ECS
-        this.world = new ECS();
-        let entity = this.world.addEntity();
-        this.world.addComponent(entity, new Body({ kind: 'circle', radius: 25, position: { x: 250, y: 50 } }));
-        this.world.addComponent(entity, new Sprite({
-            color: 'rgba(33, 204, 113, 1)',
-            lineWidth: 3,
-            strokeStyle: '#ffff'
-        }));
-        let entity2 = this.world.addEntity();
-        this.world.addComponent(entity2, new Body({
-            kind: 'square',
-            position: { x: 450, y: 50 },
-            dimension: { w: 32, h: 32 }
-        }));
-        this.world.addComponent(entity2, new Sprite({
-            color: 'rgb(17, 33, 204)',
-            lineWidth: 3,
-            strokeStyle: '#ffff'
-        }));
-        for (let i = 0; i < 10; i++) {
-            let sh;
-            if (i % 2 == 0) {
-                sh = {
-                    kind: 'circle',
-                    radius: this.getRandomInt(25),
-                    position: { x: this.getRandomInt(350), y: this.getRandomInt(450) }
-                };
-            }
-            else {
-                sh = {
-                    kind: 'square',
-                    position: { x: this.getRandomInt(350), y: this.getRandomInt(450) },
-                    dimension: { w: 32, h: 32 }
-                };
-            }
-            let ss = {
-                color: this.getRandomColor(),
-                lineWidth: 3,
-                strokeStyle: 'fff'
-            };
-            EntityFactory.create(this.world, sh, ss);
-        }
-        this.world.addSystem(new RenderSystem(this.world));
-        // 2. Game State Tracking
-        this.isRunning = false;
-        this.lastTime = 0;
-        // 3. Input Handling
-        this.keys = new Set();
-        this.initInput();
-        // 4. Bind the loop to maintain correct 'this' context
-        this.loop = this.loop.bind(this);
-    }
-    // Set up global event listeners for controls
-    initInput() {
-        window.addEventListener('keydown', e => {
-            this.keys.add(e.code);
-            // Prevent scrolling with space/arrow keys
-            if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code))
-                e.preventDefault();
-        });
-        window.addEventListener('keyup', e => {
-            this.keys.delete(e.code);
-        });
-    }
-    // Entry point to start the game
-    start() {
-        if (this.isRunning)
-            return;
-        this.isRunning = true;
-        this.lastTime = performance.now();
-        // Spawn initial entities (e.g., Player, level boundaries)
-        this.initLevel();
-        // Start the loop
-        requestAnimationFrame(this.loop);
-        console.log('Game started successfully.');
-    }
-    initLevel() {
-        // Placeholder for entity instantiation
-        // e.g., this.entities.push(new Player(this));
-    }
-    // The Main Game Loop running at ~60fps
-    loop(timeStamp) {
-        if (!this.isRunning)
-            return;
-        // Calculate Delta Time (dt) in seconds
-        const dt = (timeStamp - this.lastTime) / 1000;
-        this.lastTime = timeStamp;
-        // Cap dt to prevent massive jumps during lag spikes
-        const cappedDt = Math.min(dt, 0.1);
-        if (this.ctx != null) {
-            this.ctx.clearRect(0, 0, this.width, this.height);
-            // Draw background
-            this.ctx.fillStyle = '#1a1a2e';
-            this.ctx?.fillRect(0, 0, this.width, this.height);
-            //update
-            this.world.update(cappedDt, this.ctx);
-            //draw world
-            //this.world.draw(this.ctx)
-        }
-        // Request next frame
-        requestAnimationFrame(this.loop);
-    }
-    getRandomColor() {
-        const color = {
-            r: Math.floor(Math.random() * 256),
-            g: Math.floor(Math.random() * 256),
-            b: Math.floor(Math.random() * 256)
-        };
-        return `rgba(${color.r}, ${color.g}, ${color.b}, 1)`;
-    }
-    getRandomInt(n) {
-        return Math.floor(Math.random() * n);
-    }
-    stop() {
-        this.isRunning = false;
-    }
-}
-const myGame = new Game('canvas1');
-myGame.start();
+    });
+};
+const drawText = (pos) => {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillText(MSG, pos.x, pos.y);
+};
+// animation frame loop
+const animateloop = (timeStamp) => {
+    // calculate the delta time
+    const dt = (timeStamp - lastTime) / 1000;
+    lastTime = timeStamp;
+    const cappeDt = Math.min(dt, 0.16);
+    // Update
+    updateObject(cappeDt);
+    // Render
+    drawObject();
+    // Render Messages
+    drawText(new Vect2d(250, 50));
+    requestAnimationFrame(animateloop);
+};
+requestAnimationFrame(animateloop);
 export {};
 //# sourceMappingURL=script.js.map
