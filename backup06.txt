@@ -91,6 +91,108 @@ class Helper {
   //
 }
 
+class Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+
+  constructor(x: number, y: number, w: number, h: number) {
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
+
+  buttom(): number {
+    return this.y + this.h
+  }
+
+  left(): number {
+    return this.x
+  }
+
+  right(): number {
+    return this.x + this.w
+  }
+
+  top(): number {
+    return this.y
+  }
+
+  isCollision(rect: Rect): boolean {
+    if (
+      this.top() > rect.buttom() ||
+      this.right() < rect.left() ||
+      this.buttom() < rect.top() ||
+      this.left() > rect.right()
+    ) {
+      return false
+    }
+    return true
+  }
+}
+
+class Box {
+  pos: Vec2
+  vel: Vec2
+  acc: Vec2
+  color: string
+  rect: Rect
+  w: number
+  h: number
+  g: number = 9.8
+  isStatic: boolean
+  //
+  constructor(pos: Vec2, size: Vec2, color: string, isStatic: boolean = false) {
+    this.pos = pos
+    this.vel = new Vec2(0, 0)
+    this.acc = new Vec2(0, 0)
+    this.color = color
+    this.w = size.x
+    this.h = size.y
+    this.isStatic = isStatic
+
+    this.rect = new Rect(this.pos.x, this.pos.y, this.w, this.h)
+  }
+  //
+  isCollision(rect: Rect) {
+    if (
+      this.rect.top() > rect.buttom() ||
+      this.rect.right() < this.rect.left() ||
+      this.rect.buttom() < rect.top() ||
+      this.rect.left() > rect.right()
+    ) {
+      return false
+    }
+    return true
+  }
+  //
+  update(dt: number) {
+    if (!this.isStatic) {
+      this.acc.y = this.g * dt
+      this.vel = this.vel.add(this.acc)
+      this.pos = this.pos.add(this.vel)
+      //this.rect.x += this.pos.x;
+      this.rect.y += this.pos.y
+    }
+  }
+  //
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.fillStyle = this.color
+    ctx.fillRect(this.rect.x, this.rect.y, this.rect.w, this.rect.h)
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 3
+    ctx.strokeRect(this.rect.x, this.rect.y, this.rect.w, this.rect.h)
+  }
+}
+
+const box1 = new Box(new Vec2(250, 50), new Vec2(32, 32), '#1473a9')
+const ground = new Box(
+  new Vec2(0, CANVAS_SIZE.h - 16),
+  new Vec2(CANVAS_SIZE.w, 16),
+  '#185205'
+)
 
 //=========================================================
 
@@ -134,11 +236,19 @@ window.addEventListener('keyup', e => {
 const drawObject = (): void => {
   //clear canvas
   ctx.clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
- 
+
+  box1.draw(ctx)
+  ground.draw(ctx)
 }
 
 const updateObject = (deltatime: number): void => {
-  
+  box1.update(deltatime)
+
+  if (box1.isCollision(ground.rect)) {
+    box1.isStatic = true    
+    box1.pos.y = ground.rect.top()
+    log<string>('collition')
+  }
 }
 
 const drawText = (pos: Vec2): void => {

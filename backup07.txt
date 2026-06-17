@@ -1,0 +1,421 @@
+const canvas: HTMLCanvasElement = document.getElementById(
+  'canvas1'
+) as HTMLCanvasElement
+const ctx: CanvasRenderingContext2D = canvas.getContext(
+  '2d'
+) as CanvasRenderingContext2D
+
+const CANVAS_SIZE = { w: 640, h: 480 } as const
+
+const log = <T>(msg: T): void => {
+  console.log(`[DEBUG] - ${msg}`)
+}
+
+//=====================VARIABLE CONST======================
+let lastTime: number = 0
+let LEFT: boolean = false
+let RIGHT: boolean = false
+let UP: boolean = false
+let DOWN: boolean = false
+let MSG: string = ''
+
+//=========================================================
+
+class Vec2 {
+  x: number
+  y: number
+
+  constructor()
+  constructor(x: number, y: number)
+  constructor(v: Vec2)
+
+  constructor(a: number | Vec2 = 0, b?: number) {
+    if (a instanceof Vec2) {
+      this.x = a.x
+      this.y = a.y
+    } else if (b == undefined) {
+      this.x = a
+      this.y = 0
+    } else {
+      this.x = a
+      this.y = b
+    }
+  }
+
+  add(v: Vec2): Vec2 {
+    return new Vec2(this.x + v.x, this.y + v.y)
+  }
+
+  sub(v: Vec2): Vec2 {
+    return new Vec2(this.x - v.x, this.y - v.y)
+  }
+
+  mult(n: number): Vec2 {
+    return new Vec2(this.x * n, this.y * n)
+  }
+
+  mag(): number {
+    return Math.sqrt(this.x ** 2 + this.y ** 2)
+  }
+
+  unit(): Vec2 {
+    if (this.mag() === 0) {
+      return new Vec2()
+    } else {
+      return new Vec2(this.x / this.mag(), this.y / this.mag())
+    }
+  }
+
+  normal(): Vec2 {
+    return new Vec2(-this.y, this.x).unit()
+  }
+
+  show(): string {
+    return `{x:${this.x},y:${this.y}}`
+  }
+
+  static dot(v1: Vec2, v2: Vec2): number {
+    return v1.x * v2.x + v1.y * v2.y
+  }
+}
+
+class Helper {
+  static randInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+  //
+  static round(num: number, precision: number): number {
+    let fact: number = 10 ** precision
+    return Math.round(num * fact) / fact
+  }
+  //
+}
+
+class Rect2D {
+  x: number
+  y: number
+  w: number
+  h: number
+
+  constructor(x: number, y: number, w: number, h: number) {
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
+
+  cx(): number {
+    return this.x + this.w * 0.5
+  }
+
+  cy(): number {
+    return this.y + this.h * 0.5
+  }
+
+  isCollision(rect: Rect2D): boolean {
+    let dx = rect.cx() - this.cx()
+    let dy = rect.cy() - this.cy()
+
+    let aw = (rect.w + this.w) * 0.5
+    let ah = (rect.h + this.h) * 0.5
+
+    if (Math.abs(dx) > aw || Math.abs(dy) > ah) {
+      return false
+    }
+
+    if (Math.abs(dx / this.w) > Math.abs(dy / this.h)) {
+      if (dx < 0) {
+        rect.x = this.x - rect.w
+      } else {
+        rect.x = this.x + rect.w
+      }
+    } else {
+      if (dy < 0) {
+        rect.y = this.y - rect.h
+      } else {
+        rect.y = this.y + rect.h
+      }
+    }
+
+    return true
+  }
+
+  resCollision(rect: Rect2D): void {
+    let vec_x = this.cx() - rect.cx()
+    let vec_y = this.cy() - rect.cy()
+
+    if (vec_y * vec_y > vec_x * vec_x) {
+      if (vec_y > 0) {
+        this.y = rect.y + this.h
+      } else {
+        this.y = rect.y - this.h
+      }
+    } else {
+      if (vec_x > 0) {
+        this.x = rect.x + this.w
+      } else {
+        this.x = rect.x - this.w
+      }
+    }
+  }
+}
+
+class Box {
+  pos: Vec2
+  vel: Vec2
+  acc: Vec2
+  color: string
+  rect: Rect2D
+  g: number = 9.8
+  isStatic: boolean
+  //
+  constructor(pos: Vec2, size: Vec2, color: string, isStatic: boolean = false) {
+    this.pos = pos
+    this.vel = new Vec2(0, 0)
+    this.acc = new Vec2(0, 0)
+    this.color = color
+    this.isStatic = isStatic
+
+    this.rect = new Rect2D(this.pos.x, this.pos.y, size.x, size.y)
+  }
+
+  getRect(): Rect2D {
+    return this.rect
+  }
+
+  //
+  update(dt: number) {
+    if (!this.isStatic) {
+      this.rect.y += 1
+    }
+  }
+  //
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.fillStyle = this.color
+    ctx.fillRect(this.rect.x, this.rect.y, this.rect.w, this.rect.h)
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 3
+    ctx.strokeRect(this.rect.x, this.rect.y, this.rect.w, this.rect.h)
+  }
+}
+
+abstract class Shape2D {
+  pos: Vec2
+
+  constructor(pos: Vec2) {
+    this.pos = pos
+  }
+
+  abstract moveTo(pos: Vec2): void
+  abstract draw(ctx: CanvasRenderingContext2D): void
+}
+//
+class Circle2D extends Shape2D {
+  r: number
+  constructor(pos: Vec2, r: number) {
+    super(pos)
+    this.r = r
+  }
+
+  moveTo(pos: Vec2): void {
+    this.pos.x += pos.x - this.pos.x
+    this.pos.y += pos.y - this.pos.y
+  }
+
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.fillStyle = '#2d889c'
+    ctx.beginPath()
+    ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2 * Math.PI)
+    ctx.fill()
+    ctx.stroke()
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+}
+//
+class LineSegment2D extends Shape2D {
+  pos0: Vec2
+  pos1: Vec2
+
+  constructor(pos: Vec2, pos0: Vec2, pos1: Vec2) {
+    super(pos)
+    this.pos0 = new Vec2(pos.x + pos0.x, pos.y + pos0.y)
+    this.pos1 = new Vec2(pos.x + pos1.x, pos.y + pos1.y)
+  }
+
+  moveTo(pos: Vec2): void {
+    let vecx = pos.x - this.pos.x
+    let vecy = pos.y - this.pos.y
+
+    this.pos0.x += vecx
+    this.pos0.y += vecy
+    this.pos1.x += vecx
+    this.pos1.y += vecy
+
+    this.pos.x += vecx
+    this.pos.y += vecy
+  }
+
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.beginPath()
+    ctx.moveTo(this.pos0.x, this.pos0.y)
+    ctx.lineTo(this.pos1.x, this.pos1.x)
+    ctx.strokeStyle = 'rgb(68, 85, 255)'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+}
+//
+class Polygon2D extends Shape2D {
+  d: number
+  vertices: Array<Vec2>
+  constructor(pos: Vec2, d: number, vertices: Array<Vec2>) {
+    super(pos)
+    this.d = d
+    this.vertices = vertices
+  }
+  //
+  moveTo(pos: Vec2): void {
+    let vecx = pos.x - this.pos.x
+    let vecy = pos.y - this.pos.y
+
+    for (let i = this.vertices.length - 1; i > -1; --i) {
+      let vertex = this.vertices[i] as Vec2
+
+      vertex.x += vecx
+      vertex.y += vecy
+    }
+
+    this.pos.x += vecx
+    this.pos.y += vecy
+  }
+  //
+  rotateTo(d: number): void {
+    let dir = d - this.d
+    this.d += dir
+
+    let vecx = Math.cos(dir)
+    let vecy = Math.sin(dir)
+
+    for (let i = this.vertices.length - 1; i > -1; --i) {
+      let vertex = this.vertices[i] as Vec2
+
+      let x = vertex.x - this.pos.x
+      let y = vertex.y - this.pos.y
+
+      vertex.x = x * vecx - y * vecy + this.pos.x
+      vertex.y = x * vecy + y * vecx + this.pos.y
+    }
+  }
+  //
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.beginPath()
+    let point = this.vertices[0] as Vec2
+    ctx.moveTo(point?.x, point?.y)
+
+    for (let i = this.vertices.length - 1; i > 0; --i) {
+      point = this.vertices[i] as Vec2
+      ctx.lineTo(point.x, point.y)
+    }
+    ctx.closePath()
+
+    ctx.fillStyle = '#2d889c'
+    ctx.fill()
+    ctx.stroke()
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+}
+
+const box1 = new Box(new Vec2(250, 50), new Vec2(32, 32), '#1473a9')
+const ground = new Box(
+  new Vec2(0, CANVAS_SIZE.h - 16),
+  new Vec2(CANVAS_SIZE.w, 16),
+  '#185205'
+)
+const circle0 = new Circle2D(new Vec2(250, 25), 20)
+let arg: Array<Vec2> = new Array<Vec2>()
+arg.push(new Vec2(50, 25), new Vec2(50, 50), new Vec2(25, 50))
+const triangle0 = new Polygon2D(new Vec2(300, 45), 0, arg)
+
+//=========================================================
+
+/*--
+for (let i = 0; i < 10; i++) {
+  let x = Helper.randInt(100, 500)
+  let y = Helper.randInt(50, 400)
+  let r = Helper.randInt(10, 30)
+  let m = Helper.randInt(0, 10)
+  const other = new Ball(new Vec2(x, y), r, m)
+  objectArray.push(other)
+}
+--*/
+
+//======================Input Event========================
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') {
+    LEFT = true
+  } else if (e.key === 'ArrowRight') {
+    RIGHT = true
+  } else if (e.key === 'ArrowUp') {
+    UP = true
+  } else if (e.key === 'ArrowDown') {
+    DOWN = true
+  }
+})
+
+window.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft') {
+    LEFT = false
+  } else if (e.key === 'ArrowRight') {
+    RIGHT = false
+  } else if (e.key === 'ArrowUp') {
+    UP = false
+  } else if (e.key === 'ArrowDown') {
+    DOWN = false
+  }
+})
+//======================Input Event========================
+
+const drawObject = (): void => {
+  //clear canvas
+  ctx.clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+
+  box1.draw(ctx)
+  ground.draw(ctx)
+  circle0.draw(ctx)
+  triangle0.draw(ctx)
+}
+
+const updateObject = (deltatime: number): void => {
+  box1.update(deltatime)
+
+  if (box1.getRect().isCollision(ground.getRect())) {
+    box1.getRect().resCollision(box1.getRect())
+    box1.rect.y = 0
+  }
+}
+
+const drawText = (pos: Vec2): void => {
+  ctx.fillStyle = '#fff'
+  ctx.font = 'bold 16px Arial, sans-serif'
+  ctx.fillText(MSG, pos.x, pos.y)
+}
+
+// animation frame loop
+const animateloop = (timeStamp: number) => {
+  // calculate the delta time
+  const dt = (timeStamp - lastTime) / 1000
+  lastTime = timeStamp
+  const cappeDt = Math.min(dt, 0.16)
+
+  // Update
+  updateObject(cappeDt)
+  // Render
+  drawObject()
+
+  requestAnimationFrame(animateloop)
+}
+requestAnimationFrame(animateloop)
