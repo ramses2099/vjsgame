@@ -1,0 +1,479 @@
+const canvas: HTMLCanvasElement = document.getElementById(
+  'canvas1'
+) as HTMLCanvasElement
+const ctx: CanvasRenderingContext2D = canvas.getContext(
+  '2d'
+) as CanvasRenderingContext2D
+
+const CANVAS_SIZE = { w: 640, h: 480 } as const
+
+const log = <T>(msg: T): void => {
+  console.log(`[DEBUG] - ${msg}`)
+}
+
+//=====================VARIABLE CONST======================
+let lastTime: number = 0
+let LEFT: boolean = false
+let RIGHT: boolean = false
+let UP: boolean = false
+let DOWN: boolean = false
+let MSG: string = ''
+
+//=========================================================
+
+class Vec2 {
+  x: number
+  y: number
+
+  private constructor(x: number, y: number) {
+    this.x = x
+    this.y = y
+  }
+
+  static CreateVector(x: number = 0, y: number = 0): Vec2 {
+    return new Vec2(x, y)
+  }
+
+  static Add(v1: Vec2, v2: Vec2): Vec2 {
+    return new Vec2(v1.x + v2.x, v1.y + v2.y)
+  }
+
+  static Sub(v1: Vec2, v2: Vec2): Vec2 {
+    return new Vec2(v1.x - v2.x, v1.y - v2.y)
+  }
+
+  static Mult(v1: Vec2, n: number): Vec2 {
+    return new Vec2(v1.x * n, v1.y * n)
+  }
+
+  static Scale(v1: Vec2, scale: number): Vec2 {
+    return new Vec2(v1.x * scale, v1.y * scale)
+  }
+
+  static Mag(v1: Vec2): number {
+    return Math.sqrt(v1.x ** 2 + v1.y ** 2)
+  }
+
+  static Unit(v1: Vec2): Vec2 {
+    const mag: number = Vec2.Mag(v1)
+    if (mag === 0) {
+      return new Vec2(v1.x, v1.y)
+    } else {
+      return new Vec2(v1.x / mag, v1.y / mag)
+    }
+  }
+
+  static Normal(v1: Vec2): Vec2 {
+    const v = new Vec2(-v1.y, v1.x)
+    return Vec2.Unit(v)
+  }
+  // Product
+  static Dot(v1: Vec2, v2: Vec2): number {
+    return v1.x * v2.x + v1.y * v2.y
+  }
+
+  static Dir(v1: Vec2): number {
+    return Math.atan2(v1.y, v1.x)
+  }
+
+  static SetDirection(v1: Vec2, dir: number): Vec2 {
+    const mag = Vec2.Mag(v1)
+    return Vec2.CreateVector(Math.cos(dir) * mag, Math.sign(dir) * mag)
+  }
+
+  static SetMagnitude(v1: Vec2, mag: number): Vec2 {
+    const dir = Vec2.Dir(v1)
+    return Vec2.CreateVector(Math.cos(dir) * mag, Math.sign(dir) * mag)
+  }
+
+  static CrossProduct(v1: Vec2, v2: Vec2): Vec2 {
+    return Vec2.CreateVector(v1.x * v2.x, v1.y * v2.y)
+  }
+
+  static Invert(v1: Vec2): Vec2 {
+    return Vec2.CreateVector(-v1.x, -v1.y)
+  }
+  // Clone = Copy
+  static Clone(v1: Vec2): Vec2 {
+    return Vec2.CreateVector(v1.x, v1.y)
+  }
+
+  static FromPolar(length: number, angle: number): Vec2 {
+    return Vec2.CreateVector(length * Math.cos(angle), length * Math.sin(angle))
+  }
+
+  static RandomVec(min: number, max: number): Vec2 {
+    const x: number = Math.floor(Math.random() * (max - min + 1)) + min
+    const y: number = Math.floor(Math.random() * (max - min + 1)) + min
+    return Vec2.CreateVector(x, y)
+  }
+
+  static ToString(v1: Vec2, polar: boolean = false): string {
+    if (polar) {
+      return `Vector (p) <x:${v1.x},y:${v1.y}>`
+    } else {
+      return `Vector <x:${v1.x},y:${v1.y}>`
+    }
+  }
+  //Direction equal to angle
+  static ToArray(v1: Vec2): number[] {
+    return [v1.x, v1.y, Vec2.Dir(v1), Vec2.Mag(v1)]
+  }
+  //Direction equal to angle
+  static ToObject(v1: Vec2): any {
+    return { x: v1.x, y: v1.y, angle: Vec2.Dir(v1), length: Vec2.Mag(v1) }
+  }
+}
+
+//======================PHYSICS ENGINE======================
+namespace PhysicsEngine {
+  export enum ShapeType {
+    Rect = 0,
+    Cir = 1,
+    Pol = 2
+  }
+
+  export interface RGBodyConfig {
+    pos: Vec2
+    shapeType?: ShapeType
+    mass?: number
+    width?: number
+    height?: number
+    radius?: number
+    restitution?: number
+    isStatic?: boolean
+  }
+
+  export interface StyleConfig {
+    fsc: string
+    sts: string
+    lw: number
+  }
+
+  interface Rect {
+    left: number
+    right: number
+    top: number
+    bottom: number
+  }
+
+  export class RGBody {
+    pos: Vec2
+    vel: Vec2
+    acc: Vec2
+    shapeType: ShapeType
+    mass: number
+    invMass: number
+    width: number
+    height: number
+    radius: number
+    restitution: number
+    isStatic: boolean
+    style: StyleConfig
+
+    constructor(
+      rgbConfig: RGBodyConfig,
+      styleConfig: StyleConfig = { fsc: '#2d889c', sts: '#fff', lw: 3 }
+    ) {
+      this.pos = rgbConfig.pos
+      this.shapeType = rgbConfig.shapeType ?? ShapeType.Rect
+      this.width = rgbConfig.width ?? 0
+      this.height = rgbConfig.height ?? 0
+      this.radius = rgbConfig.radius ?? 0
+      this.isStatic = rgbConfig.isStatic ?? false
+      this.mass = this.isStatic ? 0 : rgbConfig.mass ?? 1
+      this.invMass = this.isStatic ? 0 : 1 / this.mass
+      this.restitution = this.isStatic ? 0 : rgbConfig.restitution ?? 0.3
+      this.vel = Vec2.CreateVector(0, 0)
+      this.acc = Vec2.CreateVector(0, 0)
+      this.style = {
+        fsc: styleConfig.fsc,
+        sts: styleConfig.sts,
+        lw: styleConfig.lw
+      }
+    }
+
+    ApplyForce(force: Vec2): void {
+      if (this.isStatic) return
+      // scale vec with invMas
+      const v: Vec2 = Vec2.Mult(Vec2.Clone(force), this.invMass)
+      this.acc = Vec2.Add(this.acc, v)
+    }
+
+    Update(dt: number): void {
+      const acc: Vec2 = Vec2.Add(this.acc, Vec2.Mult(this.acc, dt))
+      const vel: Vec2 = Vec2.Add(this.vel, acc)
+      this.pos = Vec2.Add(this.pos, vel)
+      Vec2.Mult(this.acc, 0)
+    }
+
+    GetBounds(): Rect {
+      return {
+        left: this.pos.x,
+        right: this.pos.x + this.width,
+        top: this.pos.y,
+        bottom: this.pos.y + this.height
+      }
+    }
+  }
+
+  export class PhysicsWorld {
+    boides: Array<RGBody>
+    gravity: Vec2
+
+    constructor() {
+      this.boides = new Array<RGBody>()
+      this.gravity = Vec2.CreateVector(0, 3)
+    }
+
+    GetBodies(): Array<RGBody> {
+      return this.boides
+    }
+
+    AddBody(body: RGBody): void {
+      this.boides.push(body)
+    }
+
+    Update(dt: number): void {
+      for (const body of this.boides) {
+        if (body.isStatic == false) {
+          const gravityForce: Vec2 = Vec2.Mult(
+            Vec2.Clone(this.gravity),
+            body.mass
+          )
+          body.ApplyForce(gravityForce)
+          body.Update(dt)
+        }
+      }
+      // Simple Collision Detection & Resolution
+      this.ResolveCollision()
+    }
+
+    private ResolveCollision(): void {
+      for (let i = 0; i < this.boides.length; i++) {
+        for (let j = i + 1; j < this.boides.length; j++) {
+          const b1: RGBody = this.boides[i] as RGBody
+          const b2: RGBody = this.boides[j] as RGBody
+
+          if (b1?.isStatic && b2?.isStatic) return
+
+          if (this.CheckAABBCollision(b1, b2)) {
+            //
+            this.PenetrationResolution(b1, b2)
+            this.ImpulseResolution(b1, b2)
+          }
+        }
+      }
+    }
+    //
+    private CheckAABBCollision(b1: RGBody, b2: RGBody): boolean {
+      const r1 = b1.GetBounds()
+      const r2 = b2.GetBounds()
+
+      return (
+        r1.left < r2.right &&
+        r1.right > r2.left &&
+        r1.top < r2.bottom &&
+        r1.bottom > r2.top
+      )
+    }
+    //
+    PenetrationResolution(b1: RGBody, b2: RGBody): void {
+      const r1: Rect = b1.GetBounds()
+      const r2: Rect = b2.GetBounds()
+
+      const overlapY = Math.min(r1.bottom, r2.bottom) - Math.max(r1.top, r2.top)
+      const percent: number = 0.2
+      const slop: number = 0.01
+      const correctionMagnitude =
+        Math.max(0, overlapY - slop) / b1.invMass + b2.invMass
+
+      const normalY = b1.pos.y < b2.pos.y ? -1 : 1
+
+      if (!b1.isStatic) b1.pos.y += normalY * b1.invMass * correctionMagnitude
+      if (!b2.isStatic) b2.pos.y -= normalY * b2.invMass * correctionMagnitude
+    }
+    //
+    private ImpulseResolution(b1: RGBody, b2: RGBody): void {
+      const relVelocity: number = b2.vel.y - b1.vel.y
+
+      const normalY = b1.pos.y < b2.pos.y ? -1 : 1
+      const velAlongNormal = relVelocity * normalY
+
+      if (velAlongNormal > 0) return
+
+      const e: number = Math.min(b1.restitution, b2.restitution)
+      let j: number = -(1 + e) * velAlongNormal
+      j /= b1.invMass + b2.invMass
+
+      if (!b1.isStatic) b1.vel.y -= b1.invMass * j * normalY
+      if (!b2.isStatic) b2.vel.y += b1.invMass * j * normalY
+    }
+  }
+
+  export class RGBodyRender {
+    private ctx: CanvasRenderingContext2D
+
+    constructor(ctx: CanvasRenderingContext2D) {
+      this.ctx = ctx
+    }
+
+    private RenderBoxBody(body: RGBody) {
+      ctx.fillStyle = body.style.fsc as string
+      ctx.fillRect(body.pos.x, body.pos.y, body.width, body.height)
+      ctx.strokeStyle = body.style.sts as string
+      ctx.lineWidth = body.style.lw as number
+      ctx.strokeRect(body.pos.x, body.pos.y, body.width, body.height)
+    }
+
+    RenderWorld(bodies: Array<RGBody>): void {
+      for (const body of bodies) {
+        if (body.shapeType == ShapeType.Rect) {
+          this.RenderBoxBody(body)
+        }
+      }
+    }
+  }
+}
+//======================PHYSICS ENGINE======================
+
+//
+class MathHelper {
+  static RandInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+  //
+  static Round(num: number, precision: number): number {
+    let fact: number = 10 ** precision
+    return Math.round(num * fact) / fact
+  }
+  //
+  static RandColor = (): string => {
+    const r: number = Math.floor(Math.random() * 256)
+    const g: number = Math.floor(Math.random() * 256)
+    const b: number = Math.floor(Math.random() * 256)
+    return `rgba(${r}, ${g}, ${b}, 1)`
+  }
+}
+
+class Paritcle {
+  pos: Vec2
+  vel: Vec2
+  acc: Vec2
+  fsc: string
+  sts: string
+  lw: number
+  w: number
+  h: number
+  constructor(
+    pos: Vec2,
+    w: number = 25,
+    h: number = 25,
+    fsc: string = '#2d889c',
+    sts: string = '#fff',
+    lw: number = 3
+  ) {
+    this.pos = pos
+    this.vel = Vec2.CreateVector()
+    this.acc = Vec2.CreateVector(1, -1)
+    this.fsc = fsc
+    this.sts = sts
+    this.lw = lw
+    this.w = w
+    this.h = h
+  }
+  //
+  Draw(ctx: CanvasRenderingContext2D): void {
+    ctx.fillStyle = this.fsc
+    ctx.fillRect(this.pos.x, this.pos.y, this.w, this.h)
+    ctx.strokeStyle = this.sts
+    ctx.lineWidth = 3
+    ctx.strokeRect(this.pos.x, this.pos.y, this.w, this.h)
+  }
+
+  Update(deltatime: number): void {
+    //
+    this.acc = Vec2.Scale(this.acc, deltatime * deltatime * 0.5)
+    log<string>(Vec2.ToString(this.acc))
+    this.vel = Vec2.Add(this.vel, this.acc)
+    this.vel = Vec2.Scale(this.vel, deltatime)
+    this.pos = Vec2.Add(this.pos, this.vel)
+    this.acc = Vec2.Mult(this.acc, 0)
+    //
+    if (this.pos.x > CANVAS_SIZE.w - this.w || this.pos.x < this.w) {
+      this.vel.x *= -1
+    }
+    //
+    if (this.pos.y > CANVAS_SIZE.h - this.h || this.pos.y < this.h) {
+      this.vel.y *= -1
+    }
+  }
+}
+
+//=========================================================
+
+const world = new PhysicsEngine.PhysicsWorld()
+
+const renderWorld = new PhysicsEngine.RGBodyRender(ctx)
+
+const part = new Paritcle(Vec2.CreateVector(250, 50))
+
+//======================Input Event========================
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') {
+    LEFT = true
+  } else if (e.key === 'ArrowRight') {
+    RIGHT = true
+  } else if (e.key === 'ArrowUp') {
+    UP = true
+  } else if (e.key === 'ArrowDown') {
+    DOWN = true
+  }
+})
+
+window.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft') {
+    LEFT = false
+  } else if (e.key === 'ArrowRight') {
+    RIGHT = false
+  } else if (e.key === 'ArrowUp') {
+    UP = false
+  } else if (e.key === 'ArrowDown') {
+    DOWN = false
+  }
+})
+//======================Input Event========================
+
+const drawObject = (): void => {
+  //clear canvas
+  ctx.clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+
+  part.Draw(ctx)
+}
+
+const updateObject = (deltatime: number): void => {
+  //
+  part.Update(deltatime)
+}
+
+const drawText = (pos: Vec2): void => {
+  ctx.fillStyle = '#fff'
+  ctx.font = 'bold 16px Arial, sans-serif'
+  ctx.fillText(MSG, pos.x, pos.y)
+}
+
+// animation frame loop
+const animateloop = (timeStamp: number) => {
+  // calculate the delta time
+  const dt = (timeStamp - lastTime) / 1000
+  lastTime = timeStamp
+  const cappeDt = Math.min(dt, 0.16)
+
+  // Update
+  updateObject(cappeDt)
+  // Render
+  drawObject()
+
+  requestAnimationFrame(animateloop)
+}
+requestAnimationFrame(animateloop)

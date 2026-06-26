@@ -11,243 +11,212 @@ const log = <T>(msg: T): void => {
   console.log(`[DEBUG] - ${msg}`)
 }
 
-//=====================VARIABLE CONST======================
-let lastTime: number = 0
-let LEFT: boolean = false
-let RIGHT: boolean = false
-let UP: boolean = false
-let DOWN: boolean = false
-let MSG: string = ''
-
-//=========================================================
-
-class Vec2 {
+//=================INTERFACES=============================
+interface Point {
   x: number
   y: number
+}
+//=================INTERFACES==========================
 
-  private constructor(x: number, y: number) {
-    this.x = x
-    this.y = y
-  }
-
-  static CreateVector(x: number = 0, y: number = 0): Vec2 {
-    return new Vec2(x, y)
-  }
-
-  static Add(v1: Vec2, v2: Vec2): Vec2 {
-    return new Vec2(v1.x + v2.x, v1.y + v2.y)
-  }
-
-  static Sub(v1: Vec2, v2: Vec2): Vec2 {
-    return new Vec2(v1.x - v2.x, v1.y - v2.y)
-  }
-
-  static Mult(v1: Vec2, n: number): Vec2 {
-    return new Vec2(v1.x * n, v1.y * n)
-  }
-
-  static Mag(v1: Vec2): number {
-    return Math.sqrt(v1.x ** 2 + v1.y ** 2)
-  }
-
-  static Unit(v1: Vec2): Vec2 {
-    const mag: number = Vec2.Mag(v1)
-    if (mag === 0) {
-      return new Vec2(v1.x, v1.y)
-    } else {
-      return new Vec2(v1.x / mag, v1.y / mag)
-    }
-  }
-
-  static Normal(v1: Vec2): Vec2 {
-    const v = new Vec2(-v1.y, v1.x)
-    return Vec2.Unit(v)
-  }
-
-  static Dot(v1: Vec2, v2: Vec2): number {
-    return v1.x * v2.x + v1.y * v2.y
-  }
-
-  static Dir(v1: Vec2): number {
-    return Math.atan2(v1.y, v1.x)
-  }
-
-  static SetDirection(v1: Vec2, dir: number): Vec2 {
-    const mag = Vec2.Mag(v1)
-    return Vec2.CreateVector(Math.cos(dir) * mag, Math.sign(dir) * mag)
-  }
-
-  static SetMagnitude(v1: Vec2, mag: number): Vec2 {
-    const dir = Vec2.Dir(v1)
-    return Vec2.CreateVector(Math.cos(dir) * mag, Math.sign(dir) * mag)
-  }
-
-  static CrossProduct(v1: Vec2, v2: Vec2): Vec2 {
-    return Vec2.CreateVector(v1.x * v2.x, v1.y * v2.y)
-  }
-
-  static Copy(v1: Vec2): Vec2 {
-    return Vec2.CreateVector(v1.x, v1.y)
-  }
-
-  static FromPolar(length: number, angle: number): Vec2 {
-    return Vec2.CreateVector(length * Math.cos(angle), length * Math.sin(angle))
-  }
-
-  static RandomVec(min: number, max: number): Vec2 {
-    const x: number = Math.floor(Math.random() * (max - min + 1)) + min
-    const y: number = Math.floor(Math.random() * (max - min + 1)) + min
-    return Vec2.CreateVector(x, y)
-  }
-
-  static ToString(v1: Vec2, polar: boolean = false): string {
-    if (polar) {
-      return `Vector (p) <x:${v1.x},y:${v1.y}>`
-    } else {
-      return `Vector <x:${v1.x},y:${v1.y}>`
-    }
-  }
-  //Direction equal to angle
-  static ToArray(v1: Vec2): number[] {
-    return [v1.x, v1.y, Vec2.Dir(v1), Vec2.Mag(v1)]
-  }
-
-  //Direction equal to angle
-  static ToObject(v1: Vec2): any {
-    return { x: v1.x, y: v1.y, angle: Vec2.Dir(v1), length: Vec2.Mag(v1) }
-  }
+//=================2D Primitives==========================
+const rect = (x: number, y: number, w: number, h: number): void => {
+  ctx.rect(x, y, w, h)
 }
 
-class MathHelper {
-  static randInt(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min
-  }
-  //
-  static round(num: number, precision: number): number {
-    let fact: number = 10 ** precision
-    return Math.round(num * fact) / fact
-  }
-  //
+const line = (x: number, y: number): void => {
+  ctx.lineTo(x, y)
 }
 
-abstract class Body {
-  pos: Vec2
-  vel: Vec2
-  acc: Vec2
-  mass: number
-
-  constructor(pos: Vec2, mass: number = 1) {
-    this.pos = pos
-    this.vel = Vec2.CreateVector()
-    this.acc = Vec2.CreateVector()
-    this.mass = mass
-  }
-
-  abstract Draw(ctx: CanvasRenderingContext2D): void
-  abstract Update(deltatime: number): void
+const ellipse = (
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+  rotation: number,
+  startAngle: number,
+  endAngle: number,
+  counterclockwise?: boolean
+): void => {
+  ctx.ellipse(
+    x,
+    y,
+    radiusX,
+    radiusY,
+    rotation,
+    startAngle,
+    endAngle,
+    counterclockwise
+  )
 }
 
-class Ball extends Body {
-  r: number
-  fsc: string
-  sts: string
-  lw: number
-  constructor(
-    pos: Vec2,
-    radius: number = 25,
-    mass: number = 1,
-    fsc: string = '#2d889c',
-    sts: string = '#fff',
-    lw: number = 3
-  ) {
-    super(pos, mass)
-    this.vel = Vec2.CreateVector()
-    this.acc = Vec2.CreateVector()
-    this.r = radius
-    this.fsc = fsc
-    this.sts = sts
-    this.lw = lw
-  }
-  
-  Draw(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = this.fsc
-    ctx.beginPath()
-    ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2 * Math.PI)
-    ctx.fill()
-    ctx.stroke()
-    ctx.strokeStyle = this.sts
-    ctx.lineWidth = this.lw
+const circle = (x: number, y: number, r: number): void => {
+  ctx.arc(x, y, r, 0, 2 * Math.PI)
+}
+
+const trinagle = (p1: Point, p2: Point, p3: Point): void => {
+  // Move to the first vertex
+  ctx.moveTo(p1.x, p1.y)
+
+  // Draw lines to the second and third vertices
+  ctx.lineTo(p2.x, p2.y)
+  ctx.lineTo(p3.x, p3.y)
+}
+
+//=================2D Primitives==========================
+const color = (r: number, g: number, b: number): string => {
+  return `rgb(${r},${g},${b})`
+}
+
+const randomColor = (): string => {
+  const r: number = Math.floor(Math.random() * 256)
+  const g: number = Math.floor(Math.random() * 256)
+  const b: number = Math.floor(Math.random() * 256)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+const fill = (): void => {
+  ctx.fill()
+}
+
+const fillColor = (color: string): void => {
+  ctx.fillStyle = color
+}
+
+const fillRect = (x: number, y: number, w: number, h: number): void => {
+  ctx.fillRect(x, y, w, h)
+}
+
+const stroke = (path?: Path2D): void => {
+  if (path) {
+    ctx.stroke(path)
+  } else {
     ctx.stroke()
   }
-
-  Update(deltatime: number): void {
-    //
-    this.vel = Vec2.Add(this.vel, this.acc)
-    this.vel = Vec2.Mult(this.vel, deltatime)
-    this.pos = Vec2.Add(this.pos, this.vel)
-    this.acc = Vec2.Mult(this.acc, 0)
-    //
-    if (this.pos.x > CANVAS_SIZE.w - this.r || this.pos.x < this.r) {
-      this.vel.x *= -1
-    }
-        //
-    if (this.pos.y > CANVAS_SIZE.h - this.r || this.pos.y < this.r) {
-      this.vel.y *= -1    
-    }
-  }
 }
 
-//=========================================================
-
-/*--
-for (let i = 0; i < 10; i++) {
-  let x = Helper.randInt(100, 500)
-  let y = Helper.randInt(50, 400)
-  let r = Helper.randInt(10, 30)
-  let m = Helper.randInt(0, 10)
-  const other = new Ball(new Vec2(x, y), r, m)
-  objectArray.push(other)
+const noStroke = (): void => {
+  ctx.strokeStyle = 'rgba(1, 1, 1, 0)'
 }
---*/
+
+const strokeStyle = (color: string): void => {
+  ctx.strokeStyle = color
+}
+
+const strokeRect = (x: number, y: number, w: number, h: number): void => {
+  ctx.strokeRect(x, y, w, h)
+}
+
+const lineWidth = (width: number): void => {
+  ctx.lineWidth = width
+}
+
+const clearRect = (x: number, y: number, w: number, h: number): void => {
+  ctx.clearRect(x, y, w, h)
+}
+
+const moveTo = (x: number, y: number): void => {
+  ctx.moveTo(x, y)
+}
+
+const translate = (x: number, y: number): void => {
+  ctx.translate(x, y)
+}
+
+const resetTransform = (): void => {
+  // Reset current transformation matrix to the identity matrix
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+}
+
+const font = (fontStyle: string): void => {
+  ctx.font = fontStyle
+}
+
+const fillText = (text: string, x: number, y: number): void => {
+  ctx.fillText(text, x, y)
+}
+
+const beginPath = (): void => {
+  ctx.beginPath()
+}
+
+const closePath = (): void => {
+  ctx.closePath()
+}
 
 //======================Input Event========================
 window.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') {
-    LEFT = true
   } else if (e.key === 'ArrowRight') {
-    RIGHT = true
   } else if (e.key === 'ArrowUp') {
-    UP = true
   } else if (e.key === 'ArrowDown') {
-    DOWN = true
   }
 })
 
 window.addEventListener('keyup', e => {
   if (e.key === 'ArrowLeft') {
-    LEFT = false
   } else if (e.key === 'ArrowRight') {
-    RIGHT = false
   } else if (e.key === 'ArrowUp') {
-    UP = false
   } else if (e.key === 'ArrowDown') {
-    DOWN = false
   }
 })
 //======================Input Event========================
 
+const c: string = randomColor()
+
 const drawObject = (): void => {
   //clear canvas
-  ctx.clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+  clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+  beginPath()
+  fillColor(c)
+  fillRect(250, 250, 25, 25)
+  strokeStyle('#fff')
+  lineWidth(2)
+  strokeRect(250, 250, 25, 25)
+
+  moveTo(30, 50) // Move the pen to (30, 50)
+  line(150, 100) // Draw a line to (150, 100)
+  stroke()
+  closePath()
+
+  // Draw the ellipse
+  beginPath()
+  ellipse(100, 300, 50, 75, Math.PI / 4, 0, 2 * Math.PI)
+  stroke()
+  closePath()
+
+  beginPath()
+  fillColor(c)
+  circle(500, 250, 25)
+  fill()
+  strokeStyle('#fff')
+  lineWidth(2)
+  stroke()
+
+  closePath()
+  beginPath()
+  fillColor('#fff')
+  font('50px serif')
+  fillText('Hello world', 350, 90)
+  closePath()
+
+  beginPath()
+  fillColor(c)
+  const p1: Point = { x: 150, y: 50 }
+  const p2: Point = { x: 50, y: 200 }
+  const p3: Point = { x: 250, y: 200 }
+  trinagle(p1, p2, p3)
+  fill()
+  closePath()
+  strokeStyle('#fff')
+  lineWidth(2)
+  stroke()
 }
 
-const updateObject = (deltatime: number): void => {}
-
-const drawText = (pos: Vec2): void => {
-  ctx.fillStyle = '#fff'
-  ctx.font = 'bold 16px Arial, sans-serif'
-  ctx.fillText(MSG, pos.x, pos.y)
+const updateObject = (deltatime: number): void => {
+  //
 }
+
+let lastTime: number = 0
 
 // animation frame loop
 const animateloop = (timeStamp: number) => {
