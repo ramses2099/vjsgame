@@ -16,6 +16,11 @@ interface Point {
   x: number
   y: number
 }
+
+interface Size {
+  w: number
+  h: number
+}
 //=================INTERFACES==========================
 
 //=================2D Primitives==========================
@@ -122,6 +127,10 @@ const translate = (x: number, y: number): void => {
   ctx.translate(x, y)
 }
 
+const rotate = (angle: number): void => {
+  ctx.rotate(angle)
+}
+
 const resetTransform = (): void => {
   // Reset current transformation matrix to the identity matrix
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -142,6 +151,146 @@ const beginPath = (): void => {
 const closePath = (): void => {
   ctx.closePath()
 }
+
+//=================Math==========================
+const min = (nums1: number, nums2: number): number => {
+  return Math.min(nums1, nums2)
+}
+
+const max = (nums1: number, nums2: number): number => {
+  return Math.max(nums1, nums2)
+}
+
+const ceil = (num: number): number => {
+  return Math.ceil(num)
+}
+
+const floor = (num: number): number => {
+  return Math.floor(num)
+}
+
+const abs = (num: number): number => {
+  return Math.abs(num)
+}
+
+const exp = (num: number): number => {
+  return Math.exp(num)
+}
+
+const pow = (base: number, exp: number): number => {
+  return Math.pow(base, exp)
+}
+
+const dist = (p1: Point, p2: Point): number => {
+  return Math.hypot(p2.x - p1.x, p2.y - p1.y)
+}
+
+const constrain = (val: number, min: number, max: number): number => {
+  return Math.min(Math.max(val, min), max)
+}
+
+const mag = (p1: Point): number => {
+  return Math.sqrt(p1.x ** 2 + p1.y ** 2)
+}
+
+const random = (n: number): number => {
+  return Math.floor(Math.random() * n)
+}
+
+//=================Math=================================================
+
+//=================Vec2=================================================
+class Vect2 {
+  x: number
+  y: number
+
+  constructor(x: number, y: number) {
+    this.x = x
+    this.y = y
+  }
+
+  add(v: Vect2): void {
+    this.x = this.x + v.x
+    this.y = this.y + v.y
+  }
+
+  sub(v: Vect2): void {
+    this.x = this.x - v.x
+    this.y = this.y - v.y
+  }
+
+  mult(n: number): void {
+    this.x = this.x * n
+    this.y = this.y * n
+  }
+
+  div(n: number): void {
+    this.x = this.x / n
+    this.y = this.y / n
+  }
+
+  mag(): number {
+    return Math.sqrt(this.x * this.x + this.y * this.y)
+  }
+
+  normalize(): void {
+    let m = this.mag()
+    if (m > 0) {
+      this.div(m)
+    }
+  }
+
+  limit(max: number): void {
+    if (this.mag() > max) {
+      this.normalize()
+      this.mult(max)
+    }
+  }
+
+  ToString(): string {
+    return `<x:${this.x}, y:${this.y}>`
+  }
+
+  static random2D(): Vect2 {
+    const x: number = Math.floor(Math.random())
+    const y: number = Math.floor(Math.random())
+    return new Vect2(x, y)
+  }
+
+  static add(v1: Vect2, v2: Vect2): Vect2 {
+    const x: number = v1.x + v2.x
+    const y: number = v1.y + v2.y
+    return new Vect2(x, y)
+  }
+
+  static sub(v1: Vect2, v2: Vect2): Vect2 {
+    const x: number = v1.x - v2.x
+    const y: number = v1.y - v2.y
+    return new Vect2(x, y)
+  }
+
+  static mult(v1: Vect2, n: number): Vect2 {
+    const x: number = v1.x * n
+    const y: number = v1.y * n
+    return new Vect2(x, y)
+  }
+
+  static div(v1: Vect2, n: number): Vect2 {
+    const x: number = v1.x / n
+    const y: number = v1.y / n
+    return new Vect2(x, y)
+  }
+
+  static ToString(v1: Vect2): string {
+    return `<x:${v1.x}, y:${v1.y}>`
+  }
+}
+
+const createVector = (x: number = 0, y: number = 0): Vect2 => {
+  return new Vect2(x, y)
+}
+
+//=================Vec2=================================================
 
 //======================Input Event========================
 window.addEventListener('keydown', e => {
@@ -166,6 +315,7 @@ const c: string = randomColor()
 const drawObject = (): void => {
   //clear canvas
   clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+
   beginPath()
   fillColor(c)
   fillRect(250, 250, 25, 25)
