@@ -1,15 +1,19 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TS, HTML, and CSS App</title>
-    <link rel="stylesheet" href="./css/styles.css">
-</head>
-<body>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
     <canvas id="canvas1" width="640" height="480"></canvas>
 
+    <div style="display: none">
+      <img id="source" src="img/test.jpg" width="300" height="227" />
+    </div>
+
     <!-- Link to the compiled JS file inside the dist folder -->
-    <script type="module"   src="./dist/script.js"></script>
-</body>
+    <script type="module" src="./dist/script.js"></script>
+  </body>
 </html>

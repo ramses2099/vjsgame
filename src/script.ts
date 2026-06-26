@@ -119,6 +119,16 @@ const clearRect = (x: number, y: number, w: number, h: number): void => {
   ctx.clearRect(x, y, w, h)
 }
 
+const drawImage = (
+  image: CanvasImageSource,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void => {
+  ctx.drawImage(image, x, y, w, h)
+}
+
 const moveTo = (x: number, y: number): void => {
   ctx.moveTo(x, y)
 }
@@ -142,6 +152,10 @@ const font = (fontStyle: string): void => {
 
 const fillText = (text: string, x: number, y: number): void => {
   ctx.fillText(text, x, y)
+}
+
+const strokeText = (text: string, x: number, y: number): void => {
+  ctx.strokeText(text, x, y)
 }
 
 const beginPath = (): void => {
@@ -229,6 +243,20 @@ class Vect2 {
     this.y = this.y / n
   }
 
+  dot(v1: Vect2, v2: Vect2): number {
+    return v1.x * v2.x + v1.y * v2.y
+  }
+
+  cross(v1: Vect2, v2: Vect2): number {
+    return v1.x * v2.y - v1.y * v2.x
+  }
+
+  lerp(v1: Vect2, n: number): void {
+    const clamp = Math.max(0, Math.min(1, n))
+    this.x = this.x + (v1.x - this.x) * clamp
+    this.y = this.y + (v1.y - this.y) * clamp
+  }
+
   mag(): number {
     return Math.sqrt(this.x * this.x + this.y * this.y)
   }
@@ -245,6 +273,28 @@ class Vect2 {
       this.normalize()
       this.mult(max)
     }
+  }
+
+  heading(inDegress: boolean = false): number {
+    let angle: number = Math.atan2(this.y, this.x)
+
+    if (angle < 0) {
+      angle += 2 * Math.PI
+    }
+
+    if (inDegress) {
+      return angle * (180 / Math.PI)
+    }
+
+    return angle
+  }
+
+  copy(): Vect2 {
+    return new Vect2(this.x, this.y)
+  }
+
+  equals(v1: Vect2): boolean {
+    return this.x === v1.x && this.y === v1.y
   }
 
   ToString(): string {
@@ -281,6 +331,17 @@ class Vect2 {
     return new Vect2(x, y)
   }
 
+  static lerp(v1: Vect2, v2: Vect2, n: number): Vect2 {
+    const clamp = Math.max(0, Math.min(1, n))
+    const x: number = v1.x + (v2.x - v1.x) * clamp
+    const y: number = v1.y + (v2.y - v1.y) * clamp
+    return new Vect2(x, y)
+  }
+
+  static equals(v1: Vect2, v2: Vect2): boolean {
+    return v1.x === v2.x && v1.y === v2.y
+  }
+
   static ToString(v1: Vect2): string {
     return `<x:${v1.x}, y:${v1.y}>`
   }
@@ -289,10 +350,28 @@ class Vect2 {
 const createVector = (x: number = 0, y: number = 0): Vect2 => {
   return new Vect2(x, y)
 }
-
 //=================Vec2=================================================
 
-//======================Input Event========================
+//=================Test=================================================
+let v0: Vect2 = createVector(1, 1)
+let v1: Vect2 = createVector(3, 3)
+
+let r: number = v0.heading(true)
+log<string>(r.toString())
+
+const image = new Image(60, 45) // Using optional size for image
+image.onload = drawImageActualSize // Draw when image has loaded
+
+// Load an image of intrinsic size 300x227 in CSS pixels
+image.src = 'img/test.jpg'
+
+function drawImageActualSize() {
+  // Use the intrinsic size of image in CSS pixels for the canvas element
+  drawImage(image, 70, 450, 45, 45)
+}
+//=================Test=================================================
+
+//======================Input Event=====================================
 window.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') {
   } else if (e.key === 'ArrowRight') {
@@ -329,10 +408,10 @@ const drawObject = (): void => {
   closePath()
 
   // Draw the ellipse
-  beginPath()
-  ellipse(100, 300, 50, 75, Math.PI / 4, 0, 2 * Math.PI)
-  stroke()
-  closePath()
+  // beginPath()
+  // ellipse(100, 300, 50, 75, Math.PI / 4, 0, 2 * Math.PI)
+  // stroke()
+  // closePath()
 
   beginPath()
   fillColor(c)
@@ -360,6 +439,8 @@ const drawObject = (): void => {
   strokeStyle('#fff')
   lineWidth(2)
   stroke()
+
+  drawImage(image, 70, 400, 45, 45)
 }
 
 const updateObject = (deltatime: number): void => {
