@@ -1,3 +1,4 @@
+
 const canvas: HTMLCanvasElement = document.getElementById(
   'canvas1'
 ) as HTMLCanvasElement
@@ -402,7 +403,6 @@ class Snowflake {
   update() {
     this.pos.add(this.vel)
     this.vel.add(this.acc)
-    this.acc.mult(0)
 
     // check for wraparound
     if (this.pos.x > this.boundaryX) {
@@ -421,15 +421,25 @@ class Snowflake {
   }
 }
 
-const NUMFLAKES: number = 500
-const snowflakes = new Array<Snowflake>()
 
-for(let i:number = 0; i < NUMFLAKES; i++){
-  snowflakes.push(new Snowflake(
-    CANVAS_SIZE.w, CANVAS_SIZE.h
-  ))
+
+
+let v0: Vect2 = createVector(1, 1)
+let v1: Vect2 = createVector(3, 3)
+
+let r: number = v0.heading(true)
+log<string>(r.toString())
+
+const image = new Image(60, 45) // Using optional size for image
+image.onload = drawImageActualSize // Draw when image has loaded
+
+// Load an image of intrinsic size 300x227 in CSS pixels
+image.src = 'img/test.jpg'
+
+function drawImageActualSize() {
+  // Use the intrinsic size of image in CSS pixels for the canvas element
+  drawImage(image, 70, 450, 45, 45)
 }
-
 //=================Test=================================================
 
 //======================Input Event=====================================
@@ -456,23 +466,56 @@ const drawObject = (): void => {
   //clear canvas
   clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
 
-  //
-  for(let flake of snowflakes){
-    fillColor(`rgba(255, 255, 255, ${flake.alpha})`)
-    beginPath()
-    circle(flake.pos.x,flake.pos.y, flake.radius)
-    fill()
-  }
+  beginPath()
+  fillColor(c)
+  fillRect(250, 250, 25, 25)
+  strokeStyle('#fff')
+  lineWidth(2)
+  strokeRect(250, 250, 25, 25)
 
+  moveTo(30, 50) // Move the pen to (30, 50)
+  line(150, 100) // Draw a line to (150, 100)
+  stroke()
+  closePath()
 
+  // Draw the ellipse
+  // beginPath()
+  // ellipse(100, 300, 50, 75, Math.PI / 4, 0, 2 * Math.PI)
+  // stroke()
+  // closePath()
+
+  beginPath()
+  fillColor(c)
+  circle(500, 250, 25)
+  fill()
+  strokeStyle('#fff')
+  lineWidth(2)
+  stroke()
+
+  closePath()
+  beginPath()
+  fillColor('#fff')
+  font('50px serif')
+  fillText('Hello world', 350, 90)
+  closePath()
+
+  beginPath()
+  fillColor(c)
+  const p1: Point = { x: 150, y: 50 }
+  const p2: Point = { x: 50, y: 200 }
+  const p3: Point = { x: 250, y: 200 }
+  trinagle(p1, p2, p3)
+  fill()
+  closePath()
+  strokeStyle('#fff')
+  lineWidth(2)
+  stroke()
+
+  drawImage(image, 70, 400, 45, 45)
 }
 
 const updateObject = (deltatime: number): void => {
   //
-  for(let flake of snowflakes){
-    flake.update()
-  }
-
 }
 
 let lastTime: number = 0

@@ -98,6 +98,12 @@ const beginPath = () => {
 const closePath = () => {
     ctx.closePath();
 };
+const save = () => {
+    ctx.save();
+};
+const scale = (x, y) => {
+    ctx.scale(x, y);
+};
 //=================Math==========================
 const min = (nums1, nums2) => {
     return Math.min(nums1, nums2);
@@ -131,6 +137,9 @@ const mag = (p1) => {
 };
 const random = (n) => {
     return Math.floor(Math.random() * n);
+};
+const randomRange = (min, max) => {
+    return min + Math.random() * (max - min);
 };
 //=================Math=================================================
 //=================Vec2=================================================
@@ -207,6 +216,11 @@ class Vect2 {
         const y = Math.floor(Math.random());
         return new Vect2(x, y);
     }
+    static randomNumBetween2D(minX, maxX, minY, maxY) {
+        const x = randomRange(minX, maxX);
+        const y = randomRange(minY, maxY);
+        return new Vect2(x, y);
+    }
     static add(v1, v2) {
         const x = v1.x + v2.x;
         const y = v1.y + v2.y;
@@ -245,17 +259,53 @@ const createVector = (x = 0, y = 0) => {
 };
 //=================Vec2=================================================
 //=================Test=================================================
-let v0 = createVector(1, 1);
-let v1 = createVector(3, 3);
-let r = v0.heading(true);
-log(r.toString());
-const image = new Image(60, 45); // Using optional size for image
-image.onload = drawImageActualSize; // Draw when image has loaded
-// Load an image of intrinsic size 300x227 in CSS pixels
-image.src = 'img/test.jpg';
-function drawImageActualSize() {
-    // Use the intrinsic size of image in CSS pixels for the canvas element
-    drawImage(image, 70, 450, 45, 45);
+class Snowflake {
+    boundaryX;
+    boundaryY;
+    pos;
+    vel;
+    acc;
+    radius;
+    alpha;
+    constructor(w, h) {
+        this.boundaryX = w;
+        this.boundaryY = h;
+        this.pos = Vect2.randomNumBetween2D(0, w, 0, h);
+        this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1);
+        this.acc = createVector();
+        this.radius = randomRange(1, 4);
+        this.alpha = randomRange(0.1, 0.9);
+    }
+    applyForce(force) {
+        this.acc.add(force);
+    }
+    update() {
+        this.pos.add(this.vel);
+        this.vel.add(this.acc);
+        this.acc.mult(0);
+        // check for wraparound
+        if (this.pos.x > this.boundaryX) {
+            this.pos.x = 0;
+        }
+        else if (this.pos.y > this.boundaryY) {
+            this.pos.y = 0;
+            this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1);
+            this.acc = createVector();
+        }
+        else if (this.pos.x < 0) {
+            this.pos.x = this.boundaryX;
+        }
+        else if (this.pos.y < 0) {
+            this.pos.y = 0;
+            this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1);
+            this.acc = createVector();
+        }
+    }
+}
+const NUMFLAKES = 500;
+const snowflakes = new Array();
+for (let i = 0; i < NUMFLAKES; i++) {
+    snowflakes.push(new Snowflake(CANVAS_SIZE.w, CANVAS_SIZE.h));
 }
 //=================Test=================================================
 //======================Input Event=====================================
@@ -284,49 +334,19 @@ const c = randomColor();
 const drawObject = () => {
     //clear canvas
     clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h);
-    beginPath();
-    fillColor(c);
-    fillRect(250, 250, 25, 25);
-    strokeStyle('#fff');
-    lineWidth(2);
-    strokeRect(250, 250, 25, 25);
-    moveTo(30, 50); // Move the pen to (30, 50)
-    line(150, 100); // Draw a line to (150, 100)
-    stroke();
-    closePath();
-    // Draw the ellipse
-    // beginPath()
-    // ellipse(100, 300, 50, 75, Math.PI / 4, 0, 2 * Math.PI)
-    // stroke()
-    // closePath()
-    beginPath();
-    fillColor(c);
-    circle(500, 250, 25);
-    fill();
-    strokeStyle('#fff');
-    lineWidth(2);
-    stroke();
-    closePath();
-    beginPath();
-    fillColor('#fff');
-    font('50px serif');
-    fillText('Hello world', 350, 90);
-    closePath();
-    beginPath();
-    fillColor(c);
-    const p1 = { x: 150, y: 50 };
-    const p2 = { x: 50, y: 200 };
-    const p3 = { x: 250, y: 200 };
-    trinagle(p1, p2, p3);
-    fill();
-    closePath();
-    strokeStyle('#fff');
-    lineWidth(2);
-    stroke();
-    drawImage(image, 70, 400, 45, 45);
+    //
+    for (let flake of snowflakes) {
+        fillColor(`rgba(255, 255, 255, ${flake.alpha})`);
+        beginPath();
+        circle(flake.pos.x, flake.pos.y, flake.radius);
+        fill();
+    }
 };
 const updateObject = (deltatime) => {
     //
+    for (let flake of snowflakes) {
+        flake.update();
+    }
 };
 let lastTime = 0;
 // animation frame loop
