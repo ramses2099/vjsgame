@@ -381,6 +381,12 @@ const createVector = (x: number = 0, y: number = 0): Vect2 => {
 //=================Vec2=================================================
 
 //=================Type=================================================//
+type SystemOptions = {
+  entities: Set<Entity>
+  delatatime?: number
+  ctx?: CanvasRenderingContext2D
+}
+
 type TransformOptions = {
   pos: Vect2
   rotation?: number
@@ -414,7 +420,6 @@ type TriangleOptions = {
 
 type TextOptions = {
   content?: string
-  color?: string
   size?: number
 }
 
@@ -422,6 +427,11 @@ type StyleOptions = {
   fillStyle?: string
   strokeStyle?: string
   lineWidth?: number
+}
+
+type DimensionOptions = {
+  width?: number
+  height?: number
 }
 
 type ShapeType = 'Rectangle' | 'Circle' | 'Triangle'
@@ -443,6 +453,16 @@ class TransfromComponent extends Component {
   }
 }
 
+class DimensionComponent extends Component {
+  width: number
+  height: number
+  constructor(options: DimensionOptions) {
+    super()
+    this.width = options.width ?? 32
+    this.height = options.height ?? 32
+  }
+}
+
 class MotionComponent extends Component {
   vel: Vect2
   acc: Vect2
@@ -452,6 +472,15 @@ class MotionComponent extends Component {
     this.vel = options.vel ?? createVector(0, 0)
     this.acc = options.acc ?? createVector(0, 0)
     this.angularVelocity = options.angularVelocity ?? 0
+  }
+}
+
+class ShapeTypeComponent extends Component {
+  shapeType: ShapeType
+
+  constructor(shapeType: ShapeType) {
+    super()
+    this.shapeType = shapeType
   }
 }
 
@@ -488,11 +517,22 @@ class TriangleComponent extends Component {
 }
 
 class CircleComponent extends Component {
-  radius?: number
+  radius: number
 
   constructor(options: CircleOptions) {
     super()
     this.radius = options.radius ?? 25
+  }
+}
+
+class TextComponent extends Component {
+  content: string
+  size: number
+
+  constructor(options: TextOptions) {
+    super()
+    this.content = options.content ?? 'Text'
+    this.size = options.size ?? 12
   }
 }
 
@@ -504,7 +544,7 @@ class StyleComponent extends Component {
   constructor(options: StyleOptions) {
     super()
     this.fillStyle = options.fillStyle ?? randomColor()
-    this.strokeStyle = options.strokeStyle ?? randomColor()
+    this.strokeStyle = options.strokeStyle ?? '#fff'
     this.lineWidth = options.lineWidth ?? 3
   }
 }
@@ -542,13 +582,157 @@ class ComponentContainer {
 
 abstract class System {
   public abstract compoenentRequired: Set<Function>
-  public abstract ecs: ECS
 
-  public abstract update(
+  public abstract update(entities: Set<Entity>, delatatime: number): void
+  public abstract draw(
     entities: Set<Entity>,
-    delatatime: number,
-    ctx: CanvasRenderingContext2D | null
+    ctx: CanvasRenderingContext2D
   ): void
+}
+
+class RenderShapeSystem extends System {
+  compoenentRequired = new Set<Function>([
+    ShapeTypeComponent,
+    TransfromComponent,
+    StyleComponent
+  ])
+  ecs: ECS
+  constructor(ecs: ECS) {
+    super()
+    this.ecs = ecs
+  }
+
+  update(entities: Set<Entity>, delatatime: number): void {}
+  draw(entities: Set<Entity>, ctx: CanvasRenderingContext2D): void {
+    for (let entity of entities) {
+      let comp = this.ecs.getComponents(entity)
+      if (comp.hasAll(this.compoenentRequired)) {
+        const shape = comp.get(ShapeTypeComponent)
+        const style = comp.get(StyleComponent)
+        const trans = comp.get(TransfromComponent)
+
+        //
+        if (shape.shapeType == 'Rectangle') {
+          const dims = comp.get(DimensionComponent)
+          beginPath()
+          fillColor(style.fillStyle)
+          fillRect(trans.pos.x, trans.pos.y, dims.width, dims.height)
+          strokeStyle(style.strokeStyle)
+          lineWidth(style.lineWidth)
+          strokeRect(trans.pos.x, trans.pos.y, dims.width, dims.height)
+          closePath()
+        }
+        //
+        if (shape.shapeType == 'Circle') {
+          const cir = comp.get(CircleComponent)
+          beginPath()
+          fillColor(style.fillStyle)
+          circle(trans.pos.x, trans.pos.y, cir.radius)
+          fill()
+          strokeStyle(style.strokeStyle)
+          lineWidth(style.lineWidth)
+          stroke()
+          closePath()
+        }
+        //
+        if (shape.shapeType == 'Triangle') {
+          const trig = comp.get(TriangleComponent)
+
+          beginPath()
+          fillColor(style.fillStyle)
+          trinagle(
+            { x: trig.p1.x, y: trig.p1.y },
+            { x: trig.p2.x, y: trig.p2.y },
+            { x: trig.p3.x, y: trig.p3.y }
+          )
+          fill()
+          strokeStyle(style.strokeStyle)
+          lineWidth(style.lineWidth)
+          stroke()
+          closePath()
+        }
+      }
+    }
+  }
+}
+
+class MotionSystem extends System {
+  compoenentRequired = new Set<Function>([MotionComponent, TransfromComponent])
+  ecs: ECS
+  constructor(ecs: ECS) {
+    super()
+    this.ecs = ecs
+  }
+
+  draw(entities: Set<Entity>, ctx: CanvasRenderingContext2D): void {}
+  update(entities: Set<Entity>, delatatime: number): void {
+    for (let entity of entities) {
+      let comp = this.ecs.getComponents(entity)
+      if (comp.hasAll(this.compoenentRequired)) {
+        const trans = comp.get(TransfromComponent)
+        const mot = comp.get(MotionComponent)
+
+        mot.acc.mult(delatatime)
+        mot.vel.add(mot.acc)
+        trans.pos.add(mot.vel)
+      }
+    }
+  }
+}
+
+class BoundariesSystem extends System {
+  compoenentRequired = new Set<Function>([MotionComponent, TransfromComponent])
+  ecs: ECS
+  constructor(ecs: ECS) {
+    super()
+    this.ecs = ecs
+  }
+
+  draw(entities: Set<Entity>, ctx: CanvasRenderingContext2D): void {}
+  update(entities: Set<Entity>, delatatime: number): void {
+    for (let entity of entities) {
+      let comp = this.ecs.getComponents(entity)
+      if (comp.hasAll(this.compoenentRequired)) {
+        const trans = comp.get(TransfromComponent)
+        const mot = comp.get(MotionComponent)
+        const shape = comp.get(ShapeTypeComponent)
+
+        if (shape.shapeType === 'Rectangle') {
+          const dims = comp.get(DimensionComponent)
+          //
+          if (
+            trans.pos.x > CANVAS_SIZE.w - dims.width ||
+            trans.pos.x < 0
+          ) {
+            mot.vel.x *= -1
+          }
+          //
+          if (
+            trans.pos.y > CANVAS_SIZE.h - dims.height ||
+            trans.pos.y < 0
+          ) {
+            mot.vel.y *= -1
+          }
+        }else if (shape.shapeType === 'Circle') {
+          const dims = comp.get(CircleComponent)
+          //
+          if (
+            trans.pos.x > CANVAS_SIZE.w - dims.radius ||
+            trans.pos.x < dims.radius
+          ) {
+            mot.vel.x *= -1
+          }
+          //
+          if (
+            trans.pos.y > CANVAS_SIZE.h - dims.radius ||
+            trans.pos.y < dims.radius
+          ) {
+            mot.vel.y *= -1
+          }
+        }
+      }
+    }
+  }
 }
 
 class ECS {
@@ -589,9 +773,6 @@ class ECS {
       console.warn(system)
       return
     }
-
-    system.ecs = this
-
     this.systems.set(system, new Set())
     for (let entity of this.entities.keys()) {
       this.checkES(entity, system)
@@ -602,13 +783,19 @@ class ECS {
     this.systems.delete(system)
   }
 
-  public update(deltatime: number, ctx: CanvasRenderingContext2D | null): void {
+  public update(deltatime: number): void {
     for (let [system, entities] of this.systems.entries()) {
-      system.update(entities, deltatime, ctx)
+      system.update(entities, deltatime)
     }
 
     while (this.entitiesToDestroy.length > 0) {
       this.destroyEntity(this.entitiesToDestroy.pop() as number)
+    }
+  }
+
+  public draw(ctx: CanvasRenderingContext2D): void {
+    for (let [system, entities] of this.systems.entries()) {
+      system.draw(entities, ctx)
     }
   }
 
@@ -654,15 +841,45 @@ window.addEventListener('keyup', e => {
 })
 //======================Input Event========================
 
-const c: string = randomColor()
+const ecs = new ECS()
+
+const entity01 = ecs.addEntity()
+ecs.addComponent(
+  entity01,
+  new TransfromComponent({ pos: createVector(250, 50) })
+)
+ecs.addComponent(entity01, new ShapeTypeComponent('Circle'))
+ecs.addComponent(entity01, new CircleComponent({}))
+ecs.addComponent(entity01, new StyleComponent({}))
+ecs.addComponent(entity01, new MotionComponent({ acc: createVector(-10, 9) }))
+
+
+const entity02 = ecs.addEntity()
+ecs.addComponent(
+  entity02,
+  new TransfromComponent({ pos: createVector(50, 50) })
+)
+ecs.addComponent(entity02, new ShapeTypeComponent('Rectangle'))
+ecs.addComponent(entity02, new RectangleComponent({}))
+ecs.addComponent(entity02, new DimensionComponent({width:25,height:25}))
+ecs.addComponent(entity02, new StyleComponent({}))
+ecs.addComponent(entity02, new MotionComponent({ acc: createVector(-10, 9) }))
+
+
+ecs.addSystem(new RenderShapeSystem(ecs))
+ecs.addSystem(new MotionSystem(ecs))
+ecs.addSystem(new BoundariesSystem(ecs))
 
 const drawObject = (): void => {
   //clear canvas
   clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+  //
+  ecs.draw(ctx)
 }
 
 const updateObject = (deltatime: number): void => {
   //
+  ecs.update(deltatime)
 }
 
 let lastTime: number = 0
