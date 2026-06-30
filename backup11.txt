@@ -380,261 +380,60 @@ const createVector = (x: number = 0, y: number = 0): Vect2 => {
 }
 //=================Vec2=================================================
 
-//=================Type=================================================//
-type TransformOptions = {
+//=================Test=================================================
+class Snowflake {
+  boundaryX: number
+  boundaryY: number
   pos: Vect2
-  rotation?: number
-  scale?: Vect2
-}
-
-type MotionOptions = {
-  vel?: Vect2
-  acc?: Vect2
-  angularVelocity?: number
-}
-
-type RectangleOptions = {
-  width?: number
-  height?: number
-  centered?: boolean
-  rotation?: number
-}
-
-type CircleOptions = {
-  radius?: number
-}
-
-type TriangleOptions = {
-  p1?: Vect2
-  p2?: Vect2
-  p3?: Vect2
-  centered?: boolean
-  rotation?: number
-}
-
-type TextOptions = {
-  content?: string
-  color?: string
-  size?: number
-}
-
-type StyleOptions = {
-  fillStyle?: string
-  strokeStyle?: string
-  lineWidth?: number
-}
-
-type ShapeType = 'Rectangle' | 'Circle' | 'Triangle'
-
-//=================ECS=================================================//
-type Entity = number
-
-abstract class Component {}
-
-class TransfromComponent extends Component {
-  pos: Vect2
-  rotation: number
-  scale: Vect2
-  constructor(options: TransformOptions) {
-    super()
-    this.pos = options.pos
-    this.rotation = options.rotation ?? 0
-    this.scale = options.scale ?? createVector(0, 0)
-  }
-}
-
-class MotionComponent extends Component {
   vel: Vect2
   acc: Vect2
-  angularVelocity: number
-  constructor(options: MotionOptions) {
-    super()
-    this.vel = options.vel ?? createVector(0, 0)
-    this.acc = options.acc ?? createVector(0, 0)
-    this.angularVelocity = options.angularVelocity ?? 0
-  }
-}
+  radius: number
+  alpha: number
 
-class RectangleComponent extends Component {
-  width: number
-  height: number
-  centered: boolean
-  rotation: number
-
-  constructor(options: RectangleOptions) {
-    super()
-    this.width = options.width ?? 32
-    this.height = options.height ?? 32
-    this.centered = options.centered ?? false
-    this.rotation = options.rotation ?? 0
-  }
-}
-
-class TriangleComponent extends Component {
-  p1: Vect2
-  p2: Vect2
-  p3: Vect2
-  centered: boolean
-  rotation: number
-
-  constructor(options: TriangleComponent) {
-    super()
-    this.p1 = options.p1 ?? createVector(50, 150)
-    this.p2 = options.p2 ?? createVector(200, 50)
-    this.p3 = options.p3 ?? createVector(200, 250)
-    this.centered = options.centered ?? false
-    this.rotation = options.rotation ?? 0
-  }
-}
-
-class CircleComponent extends Component {
-  radius?: number
-
-  constructor(options: CircleOptions) {
-    super()
-    this.radius = options.radius ?? 25
-  }
-}
-
-class StyleComponent extends Component {
-  fillStyle: string
-  strokeStyle: string
-  lineWidth: number
-
-  constructor(options: StyleOptions) {
-    super()
-    this.fillStyle = options.fillStyle ?? randomColor()
-    this.strokeStyle = options.strokeStyle ?? randomColor()
-    this.lineWidth = options.lineWidth ?? 3
-  }
-}
-
-type ComponentClass<T extends Component> = new (...args: any[]) => T
-
-class ComponentContainer {
-  private map = new Map<Function, Component>()
-
-  public add(component: Component): void {
-    this.map.set(component.constructor, component)
+  constructor(w: number, h: number) {
+    this.boundaryX = w
+    this.boundaryY = h
+    this.pos = Vect2.randomNumBetween2D(0, w, 0, h)
+    this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1)
+    this.acc = createVector()
+    this.radius = randomRange(1, 4)
+    this.alpha = randomRange(0.1, 0.9)
   }
 
-  public get<T extends Component>(componentClass: ComponentClass<T>): T {
-    return this.map.get(componentClass) as T
+  applyForce(force: Vect2) {
+    this.acc.add(force)
   }
 
-  public has(componentClass: Function): boolean {
-    return this.has(componentClass)
-  }
+  update() {
+    this.pos.add(this.vel)
+    this.vel.add(this.acc)
+    this.acc.mult(0)
 
-  public hasAll(componentClasses: Iterable<Function>): boolean {
-    for (let cls of componentClasses) {
-      if (!this.map.has(cls)) {
-        return false
-      }
-    }
-    return true
-  }
-
-  public delete(componentClass: Function): void {
-    this.map.delete(componentClass)
-  }
-}
-
-abstract class System {
-  public abstract compoenentRequired: Set<Function>
-  public abstract ecs: ECS
-
-  public abstract update(
-    entities: Set<Entity>,
-    delatatime: number,
-    ctx: CanvasRenderingContext2D | null
-  ): void
-}
-
-class ECS {
-  private entities = new Map<Entity, ComponentContainer>()
-  private systems = new Map<System, Set<Entity>>()
-
-  private nextEntityID = 0
-  private entitiesToDestroy = new Array<Entity>()
-
-  public addEntity(): Entity {
-    let entity = this.nextEntityID
-    this.nextEntityID++
-    this.entities.set(entity, new ComponentContainer())
-    return entity
-  }
-
-  public removeEntity(entity: Entity): void {
-    this.entitiesToDestroy.push(entity)
-  }
-
-  public addComponent(entity: Entity, component: Component): void {
-    this.entities.get(entity)?.add(component)
-    this.checkE(entity)
-  }
-
-  public getComponents(entity: Entity): ComponentContainer {
-    return this.entities.get(entity) as ComponentContainer
-  }
-
-  public removeComponent(entity: Entity, componentClass: Function): void {
-    this.entities.get(entity)?.delete(componentClass)
-    this.checkE(entity)
-  }
-
-  public addSystem(system: System): void {
-    if (system.compoenentRequired.size == 0) {
-      console.warn('System not added: empty Component lsit.')
-      console.warn(system)
-      return
-    }
-
-    system.ecs = this
-
-    this.systems.set(system, new Set())
-    for (let entity of this.entities.keys()) {
-      this.checkES(entity, system)
-    }
-  }
-
-  public removeSystem(system: System): void {
-    this.systems.delete(system)
-  }
-
-  public update(deltatime: number, ctx: CanvasRenderingContext2D | null): void {
-    for (let [system, entities] of this.systems.entries()) {
-      system.update(entities, deltatime, ctx)
-    }
-
-    while (this.entitiesToDestroy.length > 0) {
-      this.destroyEntity(this.entitiesToDestroy.pop() as number)
-    }
-  }
-
-  private destroyEntity(entity: Entity): void {
-    this.entities.delete(entity)
-    for (let entities of this.systems.values()) {
-      entities.delete(entity)
-    }
-  }
-
-  private checkE(entity: Entity): void {
-    for (let system of this.systems.keys()) {
-      this.checkES(entity, system)
-    }
-  }
-
-  private checkES(entity: Entity, system: System): void {
-    let have = this.entities.get(entity)
-    let need = system.compoenentRequired
-    if (have?.hasAll(need)) {
-      this.systems.get(system)?.add(entity)
-    } else {
-      this.systems.get(system)?.delete(entity)
+    // check for wraparound
+    if (this.pos.x > this.boundaryX) {
+      this.pos.x = 0
+    } else if (this.pos.y > this.boundaryY) {
+      this.pos.y = 0
+      this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1)
+      this.acc = createVector()
+    } else if (this.pos.x < 0) {
+      this.pos.x = this.boundaryX
+    } else if (this.pos.y < 0) {
+      this.pos.y = 0
+      this.vel = Vect2.randomNumBetween2D(-0.3, 0.3, 0.3, 1)
+      this.acc = createVector()
     }
   }
 }
+
+const NUMFLAKES: number = 500
+const snowflakes = new Array<Snowflake>()
+
+for (let i: number = 0; i < NUMFLAKES; i++) {
+  snowflakes.push(new Snowflake(CANVAS_SIZE.w, CANVAS_SIZE.h))
+}
+
+//=================Test=================================================
 
 //======================Input Event=====================================
 window.addEventListener('keydown', e => {
@@ -659,10 +458,21 @@ const c: string = randomColor()
 const drawObject = (): void => {
   //clear canvas
   clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h)
+
+  //
+  for (let flake of snowflakes) {
+    fillColor(`rgba(255, 255, 255, ${flake.alpha})`)
+    beginPath()
+    circle(flake.pos.x, flake.pos.y, flake.radius)
+    fill()
+  }
 }
 
 const updateObject = (deltatime: number): void => {
   //
+  for (let flake of snowflakes) {
+    flake.update()
+  }
 }
 
 let lastTime: number = 0
