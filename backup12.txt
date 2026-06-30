@@ -964,6 +964,38 @@ const entity02 = ett.createCircleEntity(createVector(250, 50), 15)
 ecs.addComponent(entity02, new MotionComponent({ acc: createVector(10, 9) }))
 const entity03 = ett.createRectangleEntity(createVector(50, 50), 25, 25)
 
+// const entity01 = ecs.addEntity()
+// ecs.addComponent(
+//   entity01,
+//   new TransfromComponent({ pos: createVector(250, 50) })
+// )
+// ecs.addComponent(entity01, new ShapeTypeComponent('Circle'))
+// ecs.addComponent(entity01, new CircleComponent({}))
+// ecs.addComponent(entity01, new StyleComponent({}))
+// ecs.addComponent(entity01, new MotionComponent({ acc: createVector(10, 9) }))
+
+// const entity02 = ecs.addEntity()
+// ecs.addComponent(
+//   entity02,
+//   new TransfromComponent({ pos: createVector(50, 50) })
+// )
+// ecs.addComponent(entity02, new ShapeTypeComponent('Rectangle'))
+// ecs.addComponent(entity02, new RectangleComponent({}))
+// ecs.addComponent(entity02, new DimensionComponent({ width: 25, height: 25 }))
+// ecs.addComponent(entity02, new StyleComponent({}))
+// ecs.addComponent(entity02, new MotionComponent({ acc: createVector(-10, 9) }))
+
+// const entity03 = ecs.addEntity()
+// ecs.addComponent(
+//   entity03,
+//   new TransfromComponent({ pos: createVector(350, 20) })
+// )
+// ecs.addComponent(
+//   entity03,
+//   new TextComponent({ content: 'Text Test', size: 12 })
+// )
+// ecs.addComponent(entity03, new StyleComponent({ fillStyle: '#fff' }))
+
 ecs.addSystem(new RenderShapeSystem(ecs))
 ecs.addSystem(new MotionSystem(ecs))
 ecs.addSystem(new BoundariesSystem(ecs))

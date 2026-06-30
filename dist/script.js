@@ -269,18 +269,9 @@ class TransfromComponent extends Component {
     scale;
     constructor(options) {
         super();
-        this.pos = options.pos;
+        this.pos = options.pos ?? createVector();
         this.rotation = options.rotation ?? 0;
         this.scale = options.scale ?? createVector(0, 0);
-    }
-}
-class DimensionComponent extends Component {
-    width;
-    height;
-    constructor(options) {
-        super();
-        this.width = options.width ?? 32;
-        this.height = options.height ?? 32;
     }
 }
 class MotionComponent extends Component {
@@ -356,6 +347,20 @@ class StyleComponent extends Component {
         this.lineWidth = options.lineWidth ?? 3;
     }
 }
+class EntityActiveComponent extends Component {
+    isActive;
+    constructor(options) {
+        super();
+        this.isActive = options.isActive ?? true;
+    }
+}
+class EntityTypeComponent extends Component {
+    entityType;
+    constructor(options) {
+        super();
+        this.entityType = options.entityType ?? 'None';
+    }
+}
 class ComponentContainer {
     map = new Map();
     add(component) {
@@ -402,7 +407,7 @@ class RenderShapeSystem extends System {
                 const trans = comp.get(TransfromComponent);
                 //
                 if (shape.shapeType == 'Rectangle') {
-                    const dims = comp.get(DimensionComponent);
+                    const dims = comp.get(RectangleComponent);
                     beginPath();
                     fillColor(style.fillStyle);
                     fillRect(trans.pos.x, trans.pos.y, dims.width, dims.height);
@@ -435,6 +440,35 @@ class RenderShapeSystem extends System {
                     stroke();
                     closePath();
                 }
+            }
+        }
+    }
+}
+class RenderTextSystem extends System {
+    compoenentRequired = new Set([
+        TextComponent,
+        TransfromComponent,
+        StyleComponent
+    ]);
+    ecs;
+    constructor(ecs) {
+        super();
+        this.ecs = ecs;
+    }
+    update(entities, delatatime) { }
+    draw(entities, ctx) {
+        for (let entity of entities) {
+            let comp = this.ecs.getComponents(entity);
+            if (comp.hasAll(this.compoenentRequired)) {
+                const tex = comp.get(TextComponent);
+                const style = comp.get(StyleComponent);
+                const trans = comp.get(TransfromComponent);
+                //
+                beginPath();
+                fillColor(style.fillStyle);
+                font(`${tex.size}px serif`);
+                fillText(tex.content, trans.pos.x, trans.pos.y);
+                closePath();
             }
         }
     }
@@ -476,15 +510,13 @@ class BoundariesSystem extends System {
                 const mot = comp.get(MotionComponent);
                 const shape = comp.get(ShapeTypeComponent);
                 if (shape.shapeType === 'Rectangle') {
-                    const dims = comp.get(DimensionComponent);
+                    const dims = comp.get(RectangleComponent);
                     //
-                    if (trans.pos.x > CANVAS_SIZE.w - dims.width ||
-                        trans.pos.x < 0) {
+                    if (trans.pos.x > CANVAS_SIZE.w - dims.width || trans.pos.x < 0) {
                         mot.vel.x *= -1;
                     }
                     //
-                    if (trans.pos.y > CANVAS_SIZE.h - dims.height ||
-                        trans.pos.y < 0) {
+                    if (trans.pos.y > CANVAS_SIZE.h - dims.height || trans.pos.y < 0) {
                         mot.vel.y *= -1;
                     }
                 }
@@ -579,6 +611,69 @@ class ECS {
         }
     }
 }
+class EntityTemplate {
+    ecs;
+    constructor(ecs) {
+        this.ecs = ecs;
+    }
+    //
+    createEmptyEntity() {
+        const entity = ecs.addEntity();
+        this.ecs.addComponent(entity, new EntityTypeComponent({}));
+        ecs.addComponent(entity, new EntityActiveComponent({}));
+        ecs.addComponent(entity, new TransfromComponent({}));
+        ecs.addComponent(entity, new StyleComponent({}));
+        return entity;
+    }
+    //
+    createCircleEntity(pos, radius) {
+        const entity = ecs.addEntity();
+        ecs.addComponent(entity, new EntityTypeComponent({}));
+        ecs.addComponent(entity, new EntityActiveComponent({}));
+        ecs.addComponent(entity, new ShapeTypeComponent('Circle'));
+        ecs.addComponent(entity, new CircleComponent({ radius: radius }));
+        ecs.addComponent(entity, new TransfromComponent({ pos: pos }));
+        ecs.addComponent(entity, new StyleComponent({}));
+        return entity;
+    }
+    //
+    createRectangleEntity(pos, width, height) {
+        const entity = ecs.addEntity();
+        ecs.addComponent(entity, new EntityTypeComponent({}));
+        ecs.addComponent(entity, new EntityActiveComponent({}));
+        ecs.addComponent(entity, new ShapeTypeComponent('Rectangle'));
+        ecs.addComponent(entity, new RectangleComponent({ width: width, height: height }));
+        ecs.addComponent(entity, new TransfromComponent({ pos: pos }));
+        ecs.addComponent(entity, new StyleComponent({}));
+        return entity;
+    }
+    //
+    createTriangleEntity(vertx1, vertx2, vertx3) {
+        const entity = ecs.addEntity();
+        ecs.addComponent(entity, new EntityTypeComponent({}));
+        ecs.addComponent(entity, new EntityActiveComponent({}));
+        ecs.addComponent(entity, new ShapeTypeComponent('Triangle'));
+        ecs.addComponent(entity, new TriangleComponent({
+            p1: vertx1,
+            p2: vertx2,
+            p3: vertx3,
+            centered: false,
+            rotation: 0
+        }));
+        ecs.addComponent(entity, new StyleComponent({}));
+        return entity;
+    }
+    //
+    createTextEntity(text, size, pos, color = '#fff') {
+        const entity = ecs.addEntity();
+        ecs.addComponent(entity, new EntityTypeComponent({}));
+        ecs.addComponent(entity, new EntityActiveComponent({}));
+        ecs.addComponent(entity, new TextComponent({ content: text, size: size }));
+        ecs.addComponent(entity, new TransfromComponent({ pos: pos }));
+        ecs.addComponent(entity, new StyleComponent({ fillStyle: color }));
+        return entity;
+    }
+}
 //======================Input Event=====================================
 window.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft') {
@@ -602,22 +697,15 @@ window.addEventListener('keyup', e => {
 });
 //======================Input Event========================
 const ecs = new ECS();
-const entity01 = ecs.addEntity();
-ecs.addComponent(entity01, new TransfromComponent({ pos: createVector(250, 50) }));
-ecs.addComponent(entity01, new ShapeTypeComponent('Circle'));
-ecs.addComponent(entity01, new CircleComponent({}));
-ecs.addComponent(entity01, new StyleComponent({}));
-ecs.addComponent(entity01, new MotionComponent({ acc: createVector(-10, 9) }));
-const entity02 = ecs.addEntity();
-ecs.addComponent(entity02, new TransfromComponent({ pos: createVector(50, 50) }));
-ecs.addComponent(entity02, new ShapeTypeComponent('Rectangle'));
-ecs.addComponent(entity02, new RectangleComponent({}));
-ecs.addComponent(entity02, new DimensionComponent({ width: 25, height: 25 }));
-ecs.addComponent(entity02, new StyleComponent({}));
-ecs.addComponent(entity02, new MotionComponent({ acc: createVector(-10, 9) }));
+const ett = new EntityTemplate(ecs);
+const entity01 = ett.createTextEntity('Text Test', 12, createVector(350, 50));
+const entity02 = ett.createCircleEntity(createVector(250, 50), 15);
+ecs.addComponent(entity02, new MotionComponent({ acc: createVector(10, 9) }));
+const entity03 = ett.createRectangleEntity(createVector(50, 50), 25, 25);
 ecs.addSystem(new RenderShapeSystem(ecs));
 ecs.addSystem(new MotionSystem(ecs));
 ecs.addSystem(new BoundariesSystem(ecs));
+ecs.addSystem(new RenderTextSystem(ecs));
 const drawObject = () => {
     //clear canvas
     clearRect(0, 0, CANVAS_SIZE.w, CANVAS_SIZE.h);
